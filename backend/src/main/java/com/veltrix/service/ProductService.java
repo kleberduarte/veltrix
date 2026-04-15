@@ -6,8 +6,10 @@ import com.veltrix.repository.ProductRepository;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -103,6 +105,15 @@ public class ProductService {
                 .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
         product.setActive(false);
         productRepository.save(product);
+    }
+
+    @Transactional
+    public int deleteAllFromCurrentCompany() {
+        Long companyId = TenantContext.getCompanyId();
+        if (companyId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida.");
+        }
+        return productRepository.deactivateAllByCompanyId(companyId);
     }
 
     public BigDecimal calcularPrecoEfetivo(Product p, int quantidade) {

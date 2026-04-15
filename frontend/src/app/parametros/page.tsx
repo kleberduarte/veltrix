@@ -16,9 +16,6 @@ import {
   type ApiFieldErrors,
 } from '@/lib/brDocuments'
 
-/** Empresa que representa o tenant "Default" — exibida sempre como "Default" na lista. */
-const DEFAULT_COMPANY_NAME = 'Default'
-
 const NOME_MIN = 3
 const NOME_MAX = 200
 const MSG_MAX = 500
@@ -29,6 +26,12 @@ const TERMOS_MAX = 20000
 
 const HEX6 = /^#([0-9A-Fa-f]{6})$/
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function isReservedCompany(company: CompanyOption): boolean {
+  if (company.systemDefault) return true
+  const n = (company.name ?? '').trim().toLowerCase()
+  return n === 'default' || n === 'sistema'
+}
 
 function segLabel(s: Segmento) {
   switch (s) {
@@ -180,6 +183,7 @@ export default function ParametrosPage() {
   const [deleteCompanyName, setDeleteCompanyName] = useState('')
   const [deletingCompany, setDeletingCompany] = useState(false)
   const [onboardingCopied, setOnboardingCopied] = useState<number | null>(null)
+  const [accessCopied, setAccessCopied] = useState<number | null>(null)
   const [onboardingRegen, setOnboardingRegen] = useState<number | null>(null)
 
   useEffect(() => {
@@ -194,7 +198,7 @@ export default function ParametrosPage() {
         const list = await userService.listCompanies().catch(() => [] as CompanyOption[])
         setCompanies(list)
 
-        const defaultCo = list.find(c => c.name === DEFAULT_COMPANY_NAME) ?? null
+        const defaultCo = list.find(isReservedCompany) ?? null
         const currentId = getAuth()?.companyId ?? null
 
         // Pré-seleciona "Default" (Restaurante Teste) ao montar a tela
@@ -270,7 +274,7 @@ export default function ParametrosPage() {
       const updatedList = await userService.listCompanies()
       setCompanies(updatedList)
       if (currentCompanyId === deleteCompanyId) {
-        const fallback = updatedList.find(c => c.name === DEFAULT_COMPANY_NAME) ?? updatedList[0] ?? null
+        const fallback = updatedList.find(isReservedCompany) ?? updatedList[0] ?? null
         if (fallback) {
           await authService.switchCompany(fallback.id)
           setCurrentCompanyId(fallback.id)
@@ -291,6 +295,22 @@ export default function ParametrosPage() {
   function buildOnboardingLink(token: string) {
     if (typeof window === 'undefined') return ''
     return `${window.location.origin}/onboarding/${token}`
+  }
+
+  function buildAccessLink(token: string) {
+    if (typeof window === 'undefined') return ''
+    return `${window.location.origin}/acesso/${token}`
+  }
+
+  async function copyAccessLink(company: CompanyOption) {
+    if (!company.accessToken) return
+    try {
+      await navigator.clipboard.writeText(buildAccessLink(company.accessToken))
+      setAccessCopied(company.id)
+      window.setTimeout(() => setAccessCopied(null), 2000)
+    } catch {
+      setEmpresaErr('Não foi possível copiar automaticamente.')
+    }
   }
 
   async function copyOnboardingLink(company: CompanyOption) {
@@ -462,9 +482,9 @@ export default function ParametrosPage() {
 
             {/* Lista unificada */}
             {(() => {
-              const defaultCo = companies.find(c => c.name === DEFAULT_COMPANY_NAME) ?? null
+              const defaultCo = companies.find(isReservedCompany) ?? null
               const ordered = defaultCo
-                ? [defaultCo, ...companies.filter(c => c.name !== DEFAULT_COMPANY_NAME)]
+                ? [defaultCo, ...companies.filter(c => c.id !== defaultCo.id)]
                 : companies
 
               if (ordered.length === 0) {
@@ -472,33 +492,36 @@ export default function ParametrosPage() {
               }
 
               return (
-                <div className="max-h-[420px] overflow-y-auto pr-1">
+                <div className="max-h-[520px] overflow-y-auto pr-1">
                   <ul className="space-y-2">
                     {ordered.map(c => {
                     const isActive = c.id === currentCompanyId
-                    const isDefaultCo = c.name === DEFAULT_COMPANY_NAME
+                    const isDefaultCo = isReservedCompany(c)
+                    const hasOnboarding = !!c.onboardingToken
                     return (
                       <li
                         key={c.id}
                         className={[
-                          'rounded-xl border transition-colors',
-                          isActive ? 'border-primary-200 bg-primary-50/50' : 'border-gray-200 bg-white',
+                          'rounded-2xl border transition-all',
+                          isActive
+                            ? 'border-primary-200 bg-primary-50/60 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300',
                         ].join(' ')}
                       >
                         {/* Linha principal */}
-                        <div className="flex items-center gap-3 px-4 py-3">
-                          {/* Radio + nome (clicável para selecionar) */}
+                        <div className="flex items-start gap-3 px-4 py-4">
+                          {/* Seleção + nome */}
                           <button
                             type="button"
                             disabled={switching}
                             onClick={() => void handleSwitchCompany(c.id)}
                             className={[
-                              'flex flex-1 items-center gap-3 min-w-0 text-left',
+                              'flex flex-1 items-start gap-3 min-w-0 text-left',
                               switching && !isActive ? 'opacity-50 cursor-not-allowed' : '',
                             ].join(' ')}
                           >
                             <span className={[
-                              'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                              'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
                               isActive ? 'border-primary-600 bg-primary-600' : 'border-gray-300 bg-white',
                             ].join(' ')}>
                               {isActive && (
@@ -507,13 +530,16 @@ export default function ParametrosPage() {
                                 </svg>
                               )}
                             </span>
-                            <span className="font-medium text-sm text-gray-900 truncate">
-                              {isDefaultCo ? 'Default' : c.name}
-                            </span>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-gray-900 truncate">{c.name}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {isActive ? 'Empresa selecionada para edição' : 'Clique para selecionar'}
+                              </p>
+                            </div>
                           </button>
 
                           {/* Badges + ações */}
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                             {isDefaultCo && (
                               <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500 ring-1 ring-gray-200">
                                 Default
@@ -528,7 +554,21 @@ export default function ParametrosPage() {
                             {/* Ações de onboarding + excluir (ADM, não-Default) */}
                             {isAdm && !isDefaultCo && (
                               <>
-                                {c.onboardingToken && (
+                                {c.accessToken && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void copyAccessLink(c)}
+                                    className={[
+                                      'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
+                                      accessCopied === c.id
+                                        ? 'border-green-200 bg-green-50 text-green-700'
+                                        : 'border-primary-200 bg-white text-primary-700 hover:bg-primary-50',
+                                    ].join(' ')}
+                                  >
+                                    {accessCopied === c.id ? 'Acesso copiado!' : 'Copiar acesso'}
+                                  </button>
+                                )}
+                                {hasOnboarding && (
                                   <button
                                     type="button"
                                     onClick={() => void copyOnboardingLink(c)}
@@ -563,18 +603,28 @@ export default function ParametrosPage() {
                           </div>
                         </div>
 
-                        {/* URL do link de onboarding (sub-linha, ADM, não-Default) */}
+                        {/* Links em layout mais legível */}
                         {isAdm && !isDefaultCo && (
-                          <div className="px-4 pb-3 -mt-1">
-                            {c.onboardingToken ? (
-                              <p className="text-xs text-gray-400 font-mono truncate">
-                                {buildOnboardingLink(c.onboardingToken)}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-amber-500">
-                                Link já utilizado — clique em &ldquo;Novo link&rdquo; para regenerar.
-                              </p>
-                            )}
+                          <div className="px-4 pb-4">
+                            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+                              {c.accessToken && (
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Link de acesso da empresa</p>
+                                  <p className="text-xs text-gray-700 font-mono break-all">{buildAccessLink(c.accessToken)}</p>
+                                </div>
+                              )}
+
+                              <div className="pt-1 border-t border-gray-200/80">
+                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Link de onboarding (primeiro acesso)</p>
+                                {hasOnboarding ? (
+                                  <p className="text-xs text-gray-600 font-mono break-all">{buildOnboardingLink(c.onboardingToken as string)}</p>
+                                ) : (
+                                  <p className="text-xs text-amber-600">
+                                    Já utilizado. Gere em <strong>Novo link</strong> para criar outro.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </li>

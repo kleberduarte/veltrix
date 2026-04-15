@@ -33,6 +33,10 @@ public class Company {
     @Column(name = "onboarding_token", length = 64, unique = true)
     private String onboardingToken;
 
+    /** Token permanente para URL exclusiva de acesso da empresa (branding no login). */
+    @Column(name = "access_token", length = 64, unique = true)
+    private String accessToken;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

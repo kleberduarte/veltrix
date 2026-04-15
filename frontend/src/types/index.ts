@@ -216,4 +216,10 @@ export interface AppUser {
   createdAt: string
 }
 
-export type CompanyOption = { id: number; name: string; systemDefault?: boolean; onboardingToken?: string | null }
+export type CompanyOption = {
+  id: number
+  name: string
+  systemDefault?: boolean
+  onboardingToken?: string | null
+  accessToken?: string | null
+}

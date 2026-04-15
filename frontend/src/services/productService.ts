@@ -38,4 +38,8 @@ export const productService = {
   async remove(id: number): Promise<void> {
     await api.delete(`/products/${id}`)
   },
+
+  async removeAll(): Promise<void> {
+    await api.delete('/products')
+  },
 }

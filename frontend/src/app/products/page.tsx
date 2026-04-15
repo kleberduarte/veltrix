@@ -85,6 +85,9 @@ export default function ProductsPage() {
   const [loteEditing, setLoteEditing] = useState<ProdutoLote | null>(null)
   const [loteSaving, setLoteSaving] = useState(false)
   const [loteError, setLoteError] = useState('')
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState('')
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const isFarmacia = !!parametro?.moduloFarmaciaAtivo
 
@@ -144,6 +147,19 @@ export default function ProductsPage() {
     if (!(await appConfirm(`Remover "${p.name}"?`, 'Excluir produto'))) return
     await productService.remove(p.id)
     await load()
+  }
+
+  async function handleDeleteAllProducts() {
+    if (bulkDeleting) return
+    setBulkDeleting(true)
+    try {
+      await productService.removeAll()
+      setShowBulkDeleteModal(false)
+      setBulkDeleteConfirmText('')
+      await load()
+    } finally {
+      setBulkDeleting(false)
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -514,6 +530,14 @@ export default function ProductsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              disabled={products.length === 0}
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-2.5 font-semibold shadow-sm hover:bg-red-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>Excluir todos</span>
+            </button>
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-gradient-to-r from-primary-50 to-white text-primary-700 px-4 py-2.5 font-semibold shadow-sm hover:shadow transition"
             >
@@ -835,6 +859,54 @@ export default function ProductsPage() {
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal exclusão em massa ─────────────────────────────────────────── */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Excluir todos os produtos</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Esta ação irá remover todos os produtos ativos da empresa atual.
+              </p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Para confirmar, digite <span className="font-semibold">EXCLUIR</span> no campo abaixo.
+              </div>
+              <input
+                value={bulkDeleteConfirmText}
+                onChange={(e) => setBulkDeleteConfirmText(e.target.value)}
+                className="input-field"
+                placeholder="Digite EXCLUIR"
+                autoFocus
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (bulkDeleting) return
+                  setShowBulkDeleteModal(false)
+                  setBulkDeleteConfirmText('')
+                }}
+                className="btn-secondary flex-1"
+                disabled={bulkDeleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllProducts}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                disabled={bulkDeleting || bulkDeleteConfirmText.trim().toUpperCase() !== 'EXCLUIR'}
+              >
+                {bulkDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
+              </button>
+            </div>
           </div>
         </div>
       )}

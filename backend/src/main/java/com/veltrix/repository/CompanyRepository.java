@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface CompanyRepository extends JpaRepository<Company, Long> {
     Optional<Company> findByPdvInviteCodeIgnoreCase(String pdvInviteCode);
     Optional<Company> findByOnboardingToken(String onboardingToken);
+    Optional<Company> findByAccessToken(String accessToken);
 }

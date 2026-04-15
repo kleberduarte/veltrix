@@ -127,20 +127,35 @@ export const authService = {
   },
 
   /** Cadastra nova empresa (somente Adm Global). */
-  async createCompany(name: string): Promise<{ id: number; name: string; onboardingToken?: string }> {
+  async createCompany(name: string): Promise<{ id: number; name: string; onboardingToken?: string; accessToken?: string }> {
     const { data } = await api.post('/auth/companies', { name })
     return data
   },
 
   /** Retorna o token de onboarding de uma empresa (somente Adm Global). */
-  async getCompanyOnboarding(companyId: number): Promise<{ id: number; name: string; onboardingToken?: string }> {
+  async getCompanyOnboarding(companyId: number): Promise<{ id: number; name: string; onboardingToken?: string; accessToken?: string }> {
     const { data } = await api.get(`/auth/companies/${companyId}/onboarding`)
     return data
   },
 
   /** Regenera o token de onboarding de uma empresa (somente Adm Global). */
-  async regenerateOnboarding(companyId: number): Promise<{ id: number; name: string; onboardingToken?: string }> {
+  async regenerateOnboarding(companyId: number): Promise<{ id: number; name: string; onboardingToken?: string; accessToken?: string }> {
     const { data } = await api.post(`/auth/companies/${companyId}/onboarding`)
+    return data
+  },
+
+  /** Busca informações públicas da empresa pelo link exclusivo de acesso (sem autenticação). */
+  async getCompanyAccessInfo(token: string): Promise<{
+    companyId: number
+    companyName: string
+    nomeEmpresa: string
+    logoUrl?: string | null
+    corPrimaria: string
+    corSecundaria: string
+    corBotao: string
+    corBotaoTexto: string
+  }> {
+    const { data } = await api.get(`/auth/company-access/${token}`)
     return data
   },
 

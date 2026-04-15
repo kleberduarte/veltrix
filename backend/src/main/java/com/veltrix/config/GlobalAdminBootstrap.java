@@ -15,6 +15,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import java.util.UUID;
 
 /**
  * Cria empresa interna + usuário com perfil {@link Role#ADM} (Adm Global) na primeira subida,
@@ -64,6 +65,7 @@ public class GlobalAdminBootstrap implements ApplicationRunner {
 
         Company company = companyRepository.save(Company.builder()
                 .name(companyName)
+                .accessToken(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""))
                 .build());
 
         userRepository.save(User.builder()

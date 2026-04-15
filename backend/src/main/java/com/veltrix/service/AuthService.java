@@ -220,8 +220,14 @@ public class AuthService {
         User current = getCurrentUser();
         if (current.getRole() == Role.ADM) {
             return companyRepository.findAll().stream()
-                    .map(c -> new CompanySummaryResponse(c.getId(), c.getName(),
-                            Boolean.TRUE.equals(c.getSystemDefault()), c.getOnboardingToken()))
+                    .map(c -> {
+                        String onboardingToken = isEmpresaReservada(c) ? null : c.getOnboardingToken();
+                        String accessToken = isEmpresaReservada(c) ? null : c.getAccessToken();
+                        return new CompanySummaryResponse(
+                                c.getId(), c.getName(),
+                                Boolean.TRUE.equals(c.getSystemDefault()),
+                                onboardingToken, accessToken);
+                    })
                     .sorted(Comparator.comparing(CompanySummaryResponse::getName))
                     .toList();
         }
@@ -422,6 +428,10 @@ public class AuthService {
         return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
     }
 
+    private static String gerarAccessToken() {
+        return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+    }
+
     private static String gerarCodigoConvite() {
         final String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         SecureRandom r = new SecureRandom();
@@ -478,12 +488,20 @@ public class AuthService {
         return r;
     }
 
-    private static boolean isEmpresaReservadaAdminEmpresa(Company company) {
+    private static boolean isEmpresaReservada(Company company) {
         if (Boolean.TRUE.equals(company.getSystemDefault())) {
             return true;
         }
         String n = company.getName();
-        return n != null && "default".equalsIgnoreCase(n.trim());
+        if (n == null) {
+            return false;
+        }
+        String normalized = n.trim();
+        return "default".equalsIgnoreCase(normalized) || "sistema".equalsIgnoreCase(normalized);
+    }
+
+    private static boolean isEmpresaReservadaAdminEmpresa(Company company) {
+        return isEmpresaReservada(company);
     }
 
     @Transactional
@@ -522,9 +540,10 @@ public class AuthService {
                 .systemDefault(false)
                 .pdvInviteCode(gerarCodigoConvite())
                 .onboardingToken(gerarOnboardingToken())
+                .accessToken(gerarAccessToken())
                 .build());
         seedParametrosPadrao(c.getId(), n);
-        return new CompanySummaryResponse(c.getId(), c.getName(), false, c.getOnboardingToken());
+        return new CompanySummaryResponse(c.getId(), c.getName(), false, c.getOnboardingToken(), c.getAccessToken());
     }
 
     /**
@@ -582,6 +601,9 @@ public class AuthService {
         Company c = companyRepository.findByOnboardingToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Link de onboarding inválido ou já utilizado."));
+        if (isEmpresaReservada(c)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de onboarding inválido ou já utilizado.");
+        }
 
         // Busca branding; usa defaults se ainda não configurado
         var parametro = parametroEmpresaRepository.findByCompanyId(c.getId()).orElse(null);
@@ -602,6 +624,9 @@ public class AuthService {
         Company c = companyRepository.findByOnboardingToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Link de onboarding inválido ou já utilizado."));
+        if (isEmpresaReservada(c)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de onboarding inválido ou já utilizado.");
+        }
 
         String email = normalizeEmail(request.getEmail());
         if (userRepository.existsByEmail(email)) {
@@ -635,7 +660,10 @@ public class AuthService {
         }
         Company c = companyRepository.findById(companyId)
                 .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada"));
-        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken());
+        if (isEmpresaReservada(c)) {
+            return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), null, null);
+        }
+        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken(), c.getAccessToken());
     }
 
     /** Regenera o token de onboarding de uma empresa (somente ADM Global). */
@@ -647,12 +675,34 @@ public class AuthService {
         }
         Company c = companyRepository.findById(companyId)
                 .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada"));
-        if (Boolean.TRUE.equals(c.getSystemDefault())) {
+        if (isEmpresaReservada(c)) {
             throw new IllegalArgumentException("A empresa padrão do sistema não possui onboarding.");
         }
         c.setOnboardingToken(gerarOnboardingToken());
         companyRepository.save(c);
-        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken());
+        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken(), c.getAccessToken());
+    }
+
+    /** Retorna branding público para a URL exclusiva de acesso da empresa. */
+    @Transactional(readOnly = true)
+    public CompanyAccessResponse getCompanyAccessInfo(String accessToken) {
+        Company c = companyRepository.findByAccessToken(accessToken)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de acesso inválido."));
+        if (isEmpresaReservada(c)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de acesso inválido.");
+        }
+
+        var parametro = parametroEmpresaRepository.findByCompanyId(c.getId()).orElse(null);
+        String nomeEmpresa = parametro != null && parametro.getNomeEmpresa() != null ? parametro.getNomeEmpresa() : c.getName();
+        String logoUrl = parametro != null ? parametro.getLogoUrl() : null;
+        String corPrimaria = parametro != null && parametro.getCorPrimaria() != null ? parametro.getCorPrimaria() : "#2563eb";
+        String corSecundaria = parametro != null && parametro.getCorSecundaria() != null ? parametro.getCorSecundaria() : "#1e3a8a";
+        String corBotao = parametro != null && parametro.getCorBotao() != null ? parametro.getCorBotao() : "#2563eb";
+        String corBotaoTexto = parametro != null && parametro.getCorBotaoTexto() != null ? parametro.getCorBotaoTexto() : "#ffffff";
+
+        return new CompanyAccessResponse(
+                c.getId(), c.getName(), nomeEmpresa, logoUrl,
+                corPrimaria, corSecundaria, corBotao, corBotaoTexto);
     }
 
     /**
