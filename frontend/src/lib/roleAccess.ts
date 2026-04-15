@@ -22,6 +22,20 @@ export function defaultHomePath(role: string | undefined): string {
   return '/dashboard'
 }
 
+function isReservedCompany(companyName?: string | null): boolean {
+  const normalized = (companyName ?? '').trim().toLowerCase()
+  return normalized === 'default' || normalized === 'sistema'
+}
+
+/** Regra de visibilidade/acesso da OS: default/sistema sempre; demais só com módulo de informática ativo. */
+export function canAccessOrdemServicoByCompany(
+  companyName?: string | null,
+  moduloInformaticaAtivo?: boolean | null
+): boolean {
+  if (isReservedCompany(companyName)) return true
+  return !!moduloInformaticaAtivo
+}
+
 /** Rotas do layout ERP que o vendedor não deve abrir (API já restringe). */
 export function canAccessErpRoute(role: string | undefined, pathname: string): boolean {
   if (!role || role === 'ADM' || role === 'ADMIN_EMPRESA') return true

@@ -9,6 +9,9 @@ public interface PdvTerminalRepository extends JpaRepository<PdvTerminal, Long> 
     List<PdvTerminal> findByCompanyId(Long companyId);
 
     List<PdvTerminal> findByCompanyIdAndAtivoTrue(Long companyId);
+
+    Optional<PdvTerminal> findByCompanyIdAndCodigo(Long companyId, String codigo);
+
     Optional<PdvTerminal> findByIdAndCompanyId(Long id, Long companyId);
     boolean existsByCodigoAndCompanyId(String codigo, Long companyId);
     void deleteByCompanyId(Long companyId);

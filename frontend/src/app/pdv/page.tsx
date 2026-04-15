@@ -97,8 +97,15 @@ export default function PdvPage() {
   const [showFechamentoModal, setShowFechamentoModal] = useState(false)
   const [showClienteModal, setShowClienteModal] = useState(false)
 
-  const auth = useMemo(() => getAuth(), [])
-  const isVendedor = auth?.role === 'VENDEDOR'
+  const [authUser, setAuthUser] = useState<ReturnType<typeof getAuth>>(null)
+  const isVendedor = authUser?.role === 'VENDEDOR'
+
+  useEffect(() => {
+    const syncAuth = () => setAuthUser(getAuth())
+    syncAuth()
+    window.addEventListener('veltrix-auth-changed', syncAuth)
+    return () => window.removeEventListener('veltrix-auth-changed', syncAuth)
+  }, [])
 
   function sairDoPdv() {
     if (isVendedor) {
@@ -184,12 +191,24 @@ export default function PdvPage() {
 
   useEffect(() => {
     if (!terminalId) return
-    pdvTerminalService.heartbeat(terminalId).catch(() => {})
+    pdvTerminalService.heartbeat(terminalId, caixaStatus).catch(() => {})
     const t = window.setInterval(() => {
-      pdvTerminalService.heartbeat(terminalId).catch(() => {})
+      pdvTerminalService.heartbeat(terminalId, caixaStatus).catch(() => {})
     }, 25000)
     return () => window.clearInterval(t)
-  }, [terminalId])
+  }, [terminalId, caixaStatus])
+
+  useEffect(() => {
+    if (!terminais.length) return
+    const preferredId = authUser?.pdvTerminalId ?? null
+    if (preferredId && terminais.some(t => t.id === preferredId)) {
+      setTerminalId(preferredId)
+      return
+    }
+    if (terminalId === '') {
+      setTerminalId(terminais[0].id)
+    }
+  }, [terminais, authUser?.pdvTerminalId, terminalId])
 
   async function openUltimas() {
     const all = await orderService.getAll()
@@ -272,7 +291,9 @@ export default function PdvPage() {
   const unit = selectedProduct?.price ?? 0
   const totalLinhaPreview = unit * Math.max(1, lineQty)
 
-  const terminalCodigo = terminalId === '' ? '—' : terminais.find(t => t.id === terminalId)?.codigo ?? String(terminalId)
+  const terminalCodigo = terminalId === ''
+    ? (authUser?.pdvTerminalCodigo ?? '—')
+    : terminais.find(t => t.id === terminalId)?.codigo ?? String(terminalId)
 
   function cycleCaixaStatus() {
     setCaixaStatus(s => (s === 'LIVRE' ? 'PAUSADO' : s === 'PAUSADO' ? 'FECHADO' : 'LIVRE'))
@@ -617,7 +638,7 @@ export default function PdvPage() {
               ·
             </span>
             <span>
-              Operador: <b>{auth?.name ?? '—'}</b>
+              Operador: <b>{authUser?.name ?? '—'}</b>
             </span>
           </div>
         </div>

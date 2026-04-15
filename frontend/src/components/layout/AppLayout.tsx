@@ -5,8 +5,9 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import { getAuth, getToken, isAuthenticated } from '@/lib/auth'
 import { authService } from '@/services/authService'
-import { canAccessErpRoute, defaultHomePath } from '@/lib/roleAccess'
+import { canAccessErpRoute, canAccessOrdemServicoByCompany, defaultHomePath } from '@/lib/roleAccess'
 import { ParametroProvider } from '@/lib/parametroContext'
+import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
 
 export default function AppLayout({
   children,
@@ -35,6 +36,27 @@ export default function AppLayout({
     if (u?.role && !canAccessErpRoute(u.role, pathname)) {
       router.replace(defaultHomePath(u.role))
     }
+  }, [pathname, router, standalonePdv])
+
+  useEffect(() => {
+    if (!isAuthenticated() || standalonePdv) return
+    if (!(pathname === '/ordens-servico' || pathname.startsWith('/ordens-servico/'))) return
+
+    const auth = getAuth()
+    ;(async () => {
+      try {
+        const p = await parametrosEmpresaService.get()
+        const allowed = canAccessOrdemServicoByCompany(
+          auth?.companyName,
+          p?.moduloInformaticaAtivo
+        )
+        if (!allowed) {
+          router.replace(defaultHomePath(auth?.role))
+        }
+      } catch {
+        router.replace(defaultHomePath(auth?.role))
+      }
+    })()
   }, [pathname, router, standalonePdv])
 
   useEffect(() => {

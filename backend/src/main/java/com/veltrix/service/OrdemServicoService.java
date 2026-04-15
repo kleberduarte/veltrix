@@ -1,14 +1,19 @@
 package com.veltrix.service;
 
 import com.veltrix.dto.ordemservico.*;
+import com.veltrix.model.Company;
 import com.veltrix.model.OrdemServico;
 import com.veltrix.model.enums.StatusOrdemServico;
+import com.veltrix.repository.CompanyRepository;
 import com.veltrix.repository.OrdemServicoRepository;
+import com.veltrix.repository.ParametroEmpresaRepository;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,6 +26,8 @@ import java.util.Set;
 public class OrdemServicoService {
 
     private final OrdemServicoRepository repository;
+    private final ParametroEmpresaRepository parametroEmpresaRepository;
+    private final CompanyRepository companyRepository;
 
     // Transições válidas de status
     private static final Map<StatusOrdemServico, Set<StatusOrdemServico>> TRANSICOES = Map.of(
@@ -33,22 +40,26 @@ public class OrdemServicoService {
     );
 
     public List<OrdemServicoResponse> findAll() {
+        assertOrdemServicoEnabledForCurrentCompany();
         return repository.findByCompanyIdOrderByDataAberturaDesc(TenantContext.getCompanyId())
                 .stream().map(this::toResponse).toList();
     }
 
     public List<OrdemServicoResponse> findByStatus(StatusOrdemServico status) {
+        assertOrdemServicoEnabledForCurrentCompany();
         return repository.findByCompanyIdAndStatusOrderByDataAberturaDesc(TenantContext.getCompanyId(), status)
                 .stream().map(this::toResponse).toList();
     }
 
     public OrdemServicoResponse findById(Long id) {
+        assertOrdemServicoEnabledForCurrentCompany();
         return toResponse(repository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("OS não encontrada")));
     }
 
     @Transactional
     public OrdemServicoResponse create(OrdemServicoRequest request) {
+        assertOrdemServicoEnabledForCurrentCompany();
         Long companyId = TenantContext.getCompanyId();
         Long numero = repository.maxNumeroOs(companyId) + 1;
 
@@ -84,6 +95,7 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponse update(Long id, OrdemServicoRequest request) {
+        assertOrdemServicoEnabledForCurrentCompany();
         OrdemServico os = repository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
 
@@ -114,6 +126,7 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponse updateStatus(Long id, StatusOrdemServico novoStatus) {
+        assertOrdemServicoEnabledForCurrentCompany();
         OrdemServico os = repository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
 
@@ -132,9 +145,42 @@ public class OrdemServicoService {
 
     @Transactional
     public void delete(Long id) {
+        assertOrdemServicoEnabledForCurrentCompany();
         OrdemServico os = repository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
         repository.delete(os);
+    }
+
+    private void assertOrdemServicoEnabledForCurrentCompany() {
+        Long companyId = TenantContext.getCompanyId();
+        if (companyId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida.");
+        }
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa não encontrada."));
+        if (isReservedCompany(company)) {
+            return;
+        }
+        boolean moduloInformaticaAtivo = parametroEmpresaRepository.findByCompanyId(companyId)
+                .map(p -> Boolean.TRUE.equals(p.getModuloInformaticaAtivo()))
+                .orElse(false);
+        if (!moduloInformaticaAtivo) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Módulo de informática desativado para esta empresa.");
+        }
+    }
+
+    private static boolean isReservedCompany(Company company) {
+        if (Boolean.TRUE.equals(company.getSystemDefault())) {
+            return true;
+        }
+        String n = company.getName();
+        if (n == null) {
+            return false;
+        }
+        String normalized = n.trim();
+        return "default".equalsIgnoreCase(normalized) || "sistema".equalsIgnoreCase(normalized);
     }
 
     private OrdemServicoResponse toResponse(OrdemServico os) {

@@ -7,8 +7,10 @@ import com.veltrix.repository.*;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +27,8 @@ public class OrderService {
     private final PmcReferenciaRepository pmcReferenciaRepository;
     private final CashFlowService cashFlowService;
     private final ProductService productService;
+    private final UserRepository userRepository;
+    private final PdvTerminalService pdvTerminalService;
 
     public List<OrderResponse> findAll() {
         return orderRepository.findByCompanyIdOrderByCreatedAtDesc(TenantContext.getCompanyId())
@@ -44,6 +48,14 @@ public class OrderService {
     public OrderResponse create(OrderRequest request) {
         Long companyId = TenantContext.getCompanyId();
 
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !StringUtils.hasText(auth.getName())) {
+            throw new IllegalStateException("Sessão inválida para registrar venda.");
+        }
+        User current = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        PdvTerminal terminal = pdvTerminalService.resolveTerminalForPdv(current, companyId, request.getTerminalId());
+
         FormaPagamento fp = request.getFormaPagamento() != null ? request.getFormaPagamento() : FormaPagamento.DINHEIRO;
         int parcelasVal = request.getParcelas() != null ? request.getParcelas() : 1;
         if (fp != FormaPagamento.CARTAO) {
@@ -52,6 +64,8 @@ public class OrderService {
 
         Order order = Order.builder()
                 .companyId(companyId)
+                .usuarioId(current.getId())
+                .nomeOperador(current.getName())
                 .formaPagamento(fp)
                 .parcelas(parcelasVal)
                 .chavePix(request.getChavePix())
@@ -106,6 +120,7 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         cashFlowService.recordCredit(companyId, total, "Venda #" + saved.getId());
+        pdvTerminalService.touchAfterSale(terminal.getId(), current.getName());
 
         return toResponse(saved);
     }

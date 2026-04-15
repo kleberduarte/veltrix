@@ -11,6 +11,41 @@ function fmtHb(iso?: string | null) {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
+function isOnline(ultimoHeartbeat?: string | null) {
+  if (!ultimoHeartbeat) return false
+  const ts = new Date(ultimoHeartbeat).getTime()
+  if (Number.isNaN(ts)) return false
+  return Date.now() - ts <= 60_000
+}
+
+function connectionBadge(online: boolean) {
+  if (online) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+        Conectado
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
+      Offline
+    </span>
+  )
+}
+
+function caixaBadge(status: PdvTerminal['statusCaixa']) {
+  if (status === 'FECHADO') {
+    return <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">Fechado</span>
+  }
+  if (status === 'PAUSADO') {
+    return <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Pausado</span>
+  }
+  if (status === 'OCUPADO') {
+    return <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">Em uso</span>
+  }
+  return <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Livre</span>
+}
+
 export default function MonitorPdvPage() {
   const router = useRouter()
   const [list, setList] = useState<PdvTerminal[]>([])
@@ -30,7 +65,7 @@ export default function MonitorPdvPage() {
       }
     }
     tick()
-    const id = window.setInterval(tick, 8000)
+    const id = window.setInterval(tick, 5000)
     return () => {
       cancelled = true
       window.clearInterval(id)
@@ -41,7 +76,8 @@ export default function MonitorPdvPage() {
     <AppLayout title="Monitor de PDVs">
       <div className="space-y-4">
         <p className="text-sm text-gray-500">
-          Lista atualizada a cada 8s — equivalente ao monitor de terminais da retaguarda legada.
+          Atualização a cada 5s. Cada venda finalizada no PDV registra operador e horário neste terminal; o heartbeat do PDV
+          também mantém o status em tempo quase real.
         </p>
         {loading && list.length === 0 ? (
           <p className="text-gray-400">Carregando...</p>
@@ -50,7 +86,7 @@ export default function MonitorPdvPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Código', 'Nome', 'Status caixa', 'Ativo', 'Último operador', 'Heartbeat'].map(h => (
+                  {['Código', 'Nome', 'Conexão', 'Status caixa', 'Ativo', 'Último operador', 'Última atividade'].map(h => (
                     <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">{h}</th>
                   ))}
                 </tr>
@@ -60,11 +96,8 @@ export default function MonitorPdvPage() {
                   <tr key={t.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-mono text-sm">{t.codigo}</td>
                     <td className="px-6 py-4 font-medium">{t.nome}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${t.statusCaixa === 'OCUPADO' ? 'bg-amber-100 text-amber-900' : 'bg-gray-100 text-gray-700'}`}>
-                        {t.statusCaixa === 'OCUPADO' ? 'Ocupado' : 'Livre'}
-                      </span>
-                    </td>
+                    <td className="px-6 py-4">{connectionBadge(isOnline(t.ultimoHeartbeat))}</td>
+                    <td className="px-6 py-4">{caixaBadge(t.statusCaixa)}</td>
                     <td className="px-6 py-4">{t.ativo ? 'Sim' : 'Não'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{t.ultimoOperador || '—'}</td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{fmtHb(t.ultimoHeartbeat)}</td>

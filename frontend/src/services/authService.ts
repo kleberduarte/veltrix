@@ -10,6 +10,8 @@ export type MeResponse = {
   role: string
   mustChangePassword?: boolean
   telefone?: string | null
+  pdvTerminalId?: number | null
+  pdvTerminalCodigo?: string | null
 }
 
 export type RegisterPayload = {
@@ -42,6 +44,8 @@ export const authService = {
       token,
       role: me.role,
       mustChangePassword: !!me.mustChangePassword,
+      pdvTerminalId: me.pdvTerminalId ?? null,
+      pdvTerminalCodigo: me.pdvTerminalCodigo ?? null,
     }
     saveAuth(u)
   },
@@ -58,6 +62,13 @@ export const authService = {
       mustChangePassword: !!data.mustChangePassword,
     })
     if (typeof window !== 'undefined') sessionStorage.removeItem('veltrix_me_synced')
+    try {
+      const { data: me } = await api.get<MeResponse>('/auth/me')
+      syncAuthFromMe(me, data.token)
+      if (typeof window !== 'undefined') sessionStorage.setItem('veltrix_me_synced', '1')
+    } catch {
+      /* AppLayout pode sincronizar depois */
+    }
     return data
   },
 
@@ -73,6 +84,13 @@ export const authService = {
       mustChangePassword: !!data.mustChangePassword,
     })
     if (typeof window !== 'undefined') sessionStorage.removeItem('veltrix_me_synced')
+    try {
+      const { data: me } = await api.get<MeResponse>('/auth/me')
+      syncAuthFromMe(me, data.token)
+      if (typeof window !== 'undefined') sessionStorage.setItem('veltrix_me_synced', '1')
+    } catch {
+      /* ignore */
+    }
     return data
   },
 

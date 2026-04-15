@@ -1,5 +1,6 @@
 import api from '@/lib/api'
 import { PdvTerminal } from '@/types'
+import type { StatusCaixa } from '@/types'
 
 export type PdvTerminalPayload = {
   codigo: string
@@ -33,7 +34,7 @@ export const pdvTerminalService = {
     await api.delete(`/pdv-terminais/${id}`)
   },
 
-  async heartbeat(id: number): Promise<void> {
-    await api.post(`/pdv-terminais/${id}/heartbeat`)
+  async heartbeat(id: number, statusCaixa?: StatusCaixa): Promise<void> {
+    await api.post(`/pdv-terminais/${id}/heartbeat`, statusCaixa ? { statusCaixa } : {})
   },
 }

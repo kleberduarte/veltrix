@@ -6,6 +6,8 @@ export interface AuthUser {
   token: string
   role?: string
   mustChangePassword?: boolean
+  pdvTerminalId?: number | null
+  pdvTerminalCodigo?: string | null
 }
 
 export function saveAuth(user: AuthUser) {

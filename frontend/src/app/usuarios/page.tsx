@@ -617,6 +617,11 @@ export default function UsuariosPage() {
                       </option>
                     ))}
                   </select>
+                  {createForm.role === 'VENDEDOR' && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Sem seleção, um terminal é criado automaticamente e aparece em Terminais PDV.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
@@ -626,15 +631,34 @@ export default function UsuariosPage() {
                     className="input-field"
                   />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={gerarSenhaAuto}
-                    onChange={e => setGerarSenhaAuto(e.target.checked)}
-                    className="rounded border-gray-300 text-primary-600"
-                  />
-                  Gerar senha automática e exigir troca no 1º acesso
-                </label>
+                <div className="rounded-xl border border-primary-200 bg-gradient-to-r from-primary-50 to-white px-3 py-3 sm:px-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-700">Senha inicial</p>
+                      <p className="mt-1 text-sm font-medium text-gray-800">Gerar senha automática e exigir troca no 1º acesso</p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-primary-700">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={gerarSenhaAuto}
+                        onClick={() => setGerarSenhaAuto(v => !v)}
+                        className={[
+                          'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                          gerarSenhaAuto ? 'bg-primary-600' : 'bg-gray-300',
+                        ].join(' ')}
+                      >
+                        <span
+                          className={[
+                            'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                            gerarSenhaAuto ? 'translate-x-4' : 'translate-x-0.5',
+                          ].join(' ')}
+                        />
+                      </button>
+                      {gerarSenhaAuto ? 'Ativo' : 'Inativo'}
+                    </label>
+                  </div>
+                </div>
                 {!gerarSenhaAuto && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Senha inicial</label>

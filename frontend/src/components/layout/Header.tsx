@@ -8,7 +8,7 @@ import { useParametro } from '@/lib/parametroContext'
 export default function Header({ title }: { title: string }) {
   const router = useRouter()
   const parametro = useParametro()
-  const user = getAuth()
+  const [user, setUser] = useState<ReturnType<typeof getAuth>>(null)
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -34,6 +34,13 @@ export default function Header({ title }: { title: string }) {
     authService.logout()
     router.push('/login')
   }
+
+  useEffect(() => {
+    const syncAuth = () => setUser(getAuth())
+    syncAuth()
+    window.addEventListener('veltrix-auth-changed', syncAuth)
+    return () => window.removeEventListener('veltrix-auth-changed', syncAuth)
+  }, [])
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {

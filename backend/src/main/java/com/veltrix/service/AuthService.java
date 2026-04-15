@@ -42,6 +42,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final PdvTerminalService pdvTerminalService;
     private final PdvTerminalRepository pdvTerminalRepository;
     private final OrderRepository orderRepository;
     private final FechamentoCaixaRepository fechamentoCaixaRepository;
@@ -77,11 +78,13 @@ public class AuthService {
         company.setPdvInviteCode(null);
         companyRepository.save(company);
 
+        pdvTerminalService.ensureAndLinkTerminalForUsuario(company.getId(), user);
+
         String token = jwtUtil.generateToken(user.getId(), company.getId(), user.getEmail(), user.getRole().name());
         return buildResponse(token, user, company);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
@@ -92,6 +95,12 @@ public class AuthService {
         if (user.getRole() == Role.ADMIN_EMPRESA && isEmpresaReservadaAdminEmpresa(user.getCompany())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Administradores de empresa não podem acessar a empresa reservada (Default).");
+        }
+
+        if (user.getPdvTerminal() == null) {
+            pdvTerminalService.ensureAndLinkTerminalForUsuario(user.getCompany().getId(), user);
+            user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getCompany().getId(), user.getEmail(), user.getRole().name());
@@ -157,6 +166,10 @@ public class AuthService {
                 .pdvTerminal(terminal)
                 .build());
 
+        if (request.getRole() == Role.VENDEDOR && user.getPdvTerminal() == null) {
+            pdvTerminalService.ensureAndLinkTerminalForUsuario(company.getId(), user);
+        }
+
         return toCreateUserResponse(user, gerada ? plain : null);
     }
 
@@ -176,10 +189,19 @@ public class AuthService {
         return buildResponse(token, user, user.getCompany());
     }
 
+    @Transactional
     public MeResponse getMe(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
         Company company = resolveTenantCompany(user);
+        Long tenantId = TenantContext.getCompanyId();
+        if (tenantId != null
+                && tenantId.equals(user.getCompany().getId())
+                && user.getPdvTerminal() == null) {
+            pdvTerminalService.ensureAndLinkTerminalForUsuario(tenantId, user);
+            user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        }
         return MeResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
@@ -189,6 +211,8 @@ public class AuthService {
                 .role(user.getRole().name())
                 .mustChangePassword(user.getMustChangePassword())
                 .telefone(user.getTelefone())
+                .pdvTerminalId(user.getPdvTerminal() != null ? user.getPdvTerminal().getId() : null)
+                .pdvTerminalCodigo(user.getPdvTerminal() != null ? user.getPdvTerminal().getCodigo() : null)
                 .build();
     }
 

@@ -14,4 +14,6 @@ public class MeResponse {
     private String role;
     private Boolean mustChangePassword;
     private String telefone;
+    private Long pdvTerminalId;
+    private String pdvTerminalCodigo;
 }

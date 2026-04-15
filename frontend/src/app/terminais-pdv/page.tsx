@@ -14,10 +14,46 @@ function fmtHeartbeat(iso?: string | null) {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
+function isOnline(ultimoHeartbeat?: string | null) {
+  if (!ultimoHeartbeat) return false
+  const ts = new Date(ultimoHeartbeat).getTime()
+  if (Number.isNaN(ts)) return false
+  return Date.now() - ts <= 60_000
+}
+
+function connectionBadge(online: boolean) {
+  if (online) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+        <span aria-hidden>🟢</span> Conectado
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700">
+      <span aria-hidden>⚫</span> Offline
+    </span>
+  )
+}
+
+function caixaBadge(status: PdvTerminal['statusCaixa']) {
+  if (status === 'FECHADO') {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800"><span aria-hidden>🔒</span> Fechado</span>
+  }
+  if (status === 'PAUSADO') {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900"><span aria-hidden>⏸️</span> Pausado</span>
+  }
+  if (status === 'OCUPADO') {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900"><span aria-hidden>🧾</span> Em uso</span>
+  }
+  return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden>✅</span> Livre</span>
+}
+
 export default function TerminaisPdvPage() {
   const router = useRouter()
   const [list, setList] = useState<PdvTerminal[]>([])
   const [loading, setLoading] = useState(true)
+  const [connectionFilter, setConnectionFilter] = useState<'ALL' | 'ONLINE' | 'OFFLINE'>('ALL')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(empty)
   const [editing, setEditing] = useState<PdvTerminal | null>(null)
@@ -29,6 +65,11 @@ export default function TerminaisPdvPage() {
     load()
   }, [router])
 
+  useEffect(() => {
+    const t = window.setInterval(() => { void load() }, 15000)
+    return () => window.clearInterval(t)
+  }, [])
+
   async function load() {
     setLoading(true)
     try {
@@ -37,6 +78,13 @@ export default function TerminaisPdvPage() {
       setLoading(false)
     }
   }
+
+  const filteredList = list.filter(t => {
+    const online = isOnline(t.ultimoHeartbeat)
+    if (connectionFilter === 'ONLINE') return online
+    if (connectionFilter === 'OFFLINE') return !online
+    return true
+  })
 
   function openCreate() {
     setEditing(null)
@@ -80,36 +128,59 @@ export default function TerminaisPdvPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <p className="text-gray-500 text-sm">Cadastro de pontos de venda e status de caixa.</p>
-          <button type="button" onClick={openCreate} className="btn-primary">+ Novo terminal</button>
+          <div className="flex items-center gap-2">
+            <select
+              value={connectionFilter}
+              onChange={e => setConnectionFilter(e.target.value as 'ALL' | 'ONLINE' | 'OFFLINE')}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700"
+            >
+              <option value="ALL">Todos</option>
+              <option value="ONLINE">Conectado</option>
+              <option value="OFFLINE">Offline</option>
+            </select>
+            <button type="button" onClick={openCreate} className="btn-primary">+ Novo terminal</button>
+          </div>
         </div>
 
         {loading ? (
           <div className="text-center py-16 text-gray-400">Carregando...</div>
-        ) : list.length === 0 ? (
+        ) : filteredList.length === 0 ? (
           <div className="card text-center py-16 text-gray-400">
             <p className="text-4xl mb-3">🖥️</p>
-            <p>Nenhum terminal cadastrado.</p>
-            <button type="button" onClick={openCreate} className="btn-primary mt-4">Cadastrar terminal</button>
+            <p>{connectionFilter === 'OFFLINE' ? 'Nenhum terminal offline no momento.' : connectionFilter === 'ONLINE' ? 'Nenhum terminal conectado no momento.' : 'Nenhum terminal cadastrado.'}</p>
+            {connectionFilter === 'ALL' && (
+              <button type="button" onClick={openCreate} className="btn-primary mt-4">Cadastrar terminal</button>
+            )}
           </div>
         ) : (
           <div className="card overflow-hidden p-0">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Código', 'Nome', 'Caixa', 'Último heartbeat', 'Ações'].map(h => (
+                  {['Terminal', 'Conexão', 'Status do PDV', 'Último heartbeat', 'Ações'].map(h => (
                     <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {list.map(t => (
+                {filteredList.map(t => {
+                  const online = isOnline(t.ultimoHeartbeat)
+                  return (
                   <tr key={t.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 font-mono text-sm text-gray-800">{t.codigo}</td>
-                    <td className="px-6 py-4 font-medium text-gray-800">{t.nome}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${t.statusCaixa === 'OCUPADO' ? 'bg-amber-100 text-amber-900' : 'bg-gray-100 text-gray-700'}`}>
-                        {t.statusCaixa === 'OCUPADO' ? 'Ocupado' : 'Livre'}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-700 ring-1 ring-primary-100">🖥️</span>
+                        <div>
+                          <p className="font-medium text-gray-800">{t.nome}</p>
+                          <p className="font-mono text-xs text-gray-500">{t.codigo}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {connectionBadge(online)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {caixaBadge(t.statusCaixa)}
                       {!t.ativo && <span className="ml-2 text-xs text-red-600">(inativo)</span>}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{fmtHeartbeat(t.ultimoHeartbeat)}</td>
@@ -120,7 +191,7 @@ export default function TerminaisPdvPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

@@ -1,12 +1,13 @@
 'use client'
 
-import type { SVGProps } from 'react'
+import { useEffect, useState, type SVGProps } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { getAuth } from '@/lib/auth'
 import { useParametro } from '@/lib/parametroContext'
 import type { Role } from '@/types'
+import { canAccessOrdemServicoByCompany } from '@/lib/roleAccess'
 
 const iconClass = 'h-5 w-5 shrink-0'
 
@@ -139,12 +140,23 @@ const nav: {
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const auth = getAuth()
+  const [auth, setAuth] = useState<ReturnType<typeof getAuth>>(null)
   const parametro = useParametro()
   const role = auth?.role as Role | undefined
   const companyName = auth?.companyName ?? parametro?.nomeEmpresa ?? 'Veltrix'
   const logoUrl = parametro?.logoUrl
-  const visibleNav = nav.filter(item => !item.roles || (role && item.roles.includes(role)))
+  const osEnabled = canAccessOrdemServicoByCompany(companyName, parametro?.moduloInformaticaAtivo)
+  const visibleNav = nav.filter(item => {
+    if (item.href === '/ordens-servico' && !osEnabled) return false
+    return !item.roles || (role && item.roles.includes(role))
+  })
+
+  useEffect(() => {
+    const syncAuth = () => setAuth(getAuth())
+    syncAuth()
+    window.addEventListener('veltrix-auth-changed', syncAuth)
+    return () => window.removeEventListener('veltrix-auth-changed', syncAuth)
+  }, [])
 
   function handleLogout() {
     authService.logout()

@@ -82,7 +82,7 @@ export type StatusOrdemServico =
   | 'CONCLUIDA'
   | 'ENTREGUE'
   | 'CANCELADA'
-export type StatusCaixa = 'LIVRE' | 'OCUPADO'
+export type StatusCaixa = 'LIVRE' | 'PAUSADO' | 'FECHADO' | 'OCUPADO'
 
 export interface Cliente {
   id: number

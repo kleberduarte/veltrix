@@ -46,8 +46,10 @@ public class PdvTerminalController {
     }
 
     @PostMapping("/{id}/heartbeat")
-    public ResponseEntity<Void> heartbeat(@PathVariable Long id, Authentication auth) {
-        service.heartbeat(id, auth.getName());
+    public ResponseEntity<Void> heartbeat(@PathVariable Long id,
+                                          @RequestBody(required = false) PdvHeartbeatRequest request,
+                                          Authentication auth) {
+        service.heartbeat(id, auth.getName(), request != null ? request.getStatusCaixa() : null);
         return ResponseEntity.ok().build();
     }
 
