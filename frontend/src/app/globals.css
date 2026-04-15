@@ -35,6 +35,10 @@
     color: var(--veltrix-cor-texto);
     @apply antialiased;
   }
+
+  button {
+    @apply rounded-xl text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-60;
+  }
 }
 
 /* Números alinhados e legíveis (valores, qtd, totais) — uso no PDV e cupom */
@@ -47,16 +51,22 @@
 }
 
 @layer components {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
   .btn-primary {
-    background-color: var(--veltrix-cor-botao, #2563eb);
+    background-color: var(--veltrix-cor-botao, var(--veltrix-cor-primaria, #2563eb));
     color: var(--veltrix-cor-botao-texto, #ffffff);
-    @apply hover:brightness-[0.93] font-semibold py-3 px-6 rounded-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply hover:brightness-[0.93] active:scale-[0.99];
   }
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-150;
+    @apply border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99];
   }
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-150;
+    @apply border border-red-500 bg-red-500 text-white hover:bg-red-600 hover:border-red-600 active:scale-[0.99];
   }
   .input-field {
     @apply w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;

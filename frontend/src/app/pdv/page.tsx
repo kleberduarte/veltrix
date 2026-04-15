@@ -87,6 +87,8 @@ export default function PdvPage() {
   const [ultimas, setUltimas] = useState<Order[]>([])
   const [showUltimas, setShowUltimas] = useState(false)
   const [nomeEmpresa, setNomeEmpresa] = useState('Veltrix')
+  const [logoEmpresaUrl, setLogoEmpresaUrl] = useState('')
+  const [logoFalhou, setLogoFalhou] = useState(false)
   const [pedidoCodigo, setPedidoCodigo] = useState('')
   const [caixaStatus, setCaixaStatus] = useState<CaixaVisual>('LIVRE')
   const [showPagamentoModal, setShowPagamentoModal] = useState(false)
@@ -163,6 +165,13 @@ export default function PdvPage() {
     }
     setFarmacia(!!par?.moduloFarmaciaAtivo)
     if (par?.nomeEmpresa?.trim()) setNomeEmpresa(par.nomeEmpresa.trim())
+    if (par?.logoUrl?.trim()) {
+      setLogoEmpresaUrl(par.logoUrl.trim())
+      setLogoFalhou(false)
+    } else {
+      setLogoEmpresaUrl('')
+      setLogoFalhou(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -523,6 +532,13 @@ export default function PdvPage() {
   }, [selectedProduct, cart, lineQty])
 
   const heroName = selectedProduct?.name ?? (search.trim() ? 'Nenhum resultado' : 'Aguardando produto')
+  const empresaSigla = nomeEmpresa
+    .split(' ')
+    .slice(0, 2)
+    .map(part => part[0] || '')
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
   const fieldClass =
     'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 sm:py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 min-h-[44px] sm:min-h-0'
@@ -551,11 +567,30 @@ export default function PdvPage() {
           <button
             type="button"
             onClick={sairDoPdv}
-            className="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
+            className="inline-flex items-center gap-2 rounded-full border border-primary-200/80 bg-primary-50/80 px-3 py-1.5 text-sm font-semibold text-primary-800 shadow-sm transition-all hover:-translate-y-[1px] hover:bg-primary-100/80 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
           >
-            ← Painel
+            <span aria-hidden className="text-base leading-none">←</span>
+            <span>Painel</span>
           </button>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Veltrix · PDV</span>
+          <div className="inline-flex items-center gap-2 rounded-full border border-gray-200/90 bg-white px-2 py-1 shadow-sm">
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-primary-100 to-primary-50 ring-1 ring-primary-200/80">
+              {logoEmpresaUrl && !logoFalhou ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoEmpresaUrl}
+                  alt={`Logo ${nomeEmpresa}`}
+                  className="h-full w-full object-contain bg-white"
+                  onError={() => setLogoFalhou(true)}
+                />
+              ) : (
+                <span className="text-[11px] font-bold tracking-wide text-primary-800">{empresaSigla || 'PDV'}</span>
+              )}
+            </div>
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span className="max-w-[180px] truncate text-[11px] font-semibold text-gray-700">{nomeEmpresa}</span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-gray-400">PDV</span>
+            </div>
+          </div>
         </div>
 
         {/* Barra superior PDV (layout sistema-cadastro) */}

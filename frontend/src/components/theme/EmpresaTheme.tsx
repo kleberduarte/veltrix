@@ -39,9 +39,16 @@ function clearPrimaryPalette(root: HTMLElement) {
 function aplicarPaletaPrimary(
   root: HTMLElement,
   corPrimaria: string | null | undefined,
+  corBotao: string | null | undefined,
   corSecundaria: string | null | undefined
 ) {
-  const prim = corPrimaria && HEX.test(corPrimaria.trim()) ? hexToRgb(corPrimaria.trim()) : null
+  const primHex =
+    (corPrimaria && HEX.test(corPrimaria.trim()) && corPrimaria.trim())
+    || (corBotao && HEX.test(corBotao.trim()) && corBotao.trim())
+    || (corSecundaria && HEX.test(corSecundaria.trim()) && corSecundaria.trim())
+    || null
+
+  const prim = primHex ? hexToRgb(primHex) : null
   const sec = corSecundaria && HEX.test(corSecundaria.trim()) ? hexToRgb(corSecundaria.trim()) : null
 
   if (!prim) {
@@ -89,13 +96,14 @@ function aplicarCores(root: HTMLElement, p: Awaited<ReturnType<typeof parametros
     if (val && HEX.test(val.trim())) root.style.setProperty(name, val.trim())
     else root.style.removeProperty(name)
   }
-  set('--veltrix-cor-primaria', p.corPrimaria)
+  const corPrimariaResolved = p.corPrimaria || p.corBotao || p.corSecundaria || null
+  set('--veltrix-cor-primaria', corPrimariaResolved)
   set('--veltrix-cor-secundaria', p.corSecundaria)
   set('--veltrix-cor-fundo', p.corFundo)
   set('--veltrix-cor-texto', p.corTexto)
   set('--veltrix-cor-botao', p.corBotao)
   set('--veltrix-cor-botao-texto', p.corBotaoTexto)
-  aplicarPaletaPrimary(root, p.corPrimaria, p.corSecundaria)
+  aplicarPaletaPrimary(root, corPrimariaResolved, p.corBotao, p.corSecundaria)
 }
 
 /** Aplica cores dos parâmetros da empresa ao documento (equivalente ao tema do legado por tenant). */

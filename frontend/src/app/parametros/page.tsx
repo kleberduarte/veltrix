@@ -425,6 +425,7 @@ export default function ParametrosPage() {
         </header>
 
         <form onSubmit={handleSave} className="space-y-6">
+
           {/* ── Empresas ── */}
           <section className="rounded-2xl border border-gray-200/90 bg-white p-6 shadow-sm ring-1 ring-black/[0.03]">
             {/* Cabeçalho + form inline de nova empresa */}
@@ -471,8 +472,9 @@ export default function ParametrosPage() {
               }
 
               return (
-                <ul className="space-y-2">
-                  {ordered.map(c => {
+                <div className="max-h-[420px] overflow-y-auto pr-1">
+                  <ul className="space-y-2">
+                    {ordered.map(c => {
                     const isActive = c.id === currentCompanyId
                     const isDefaultCo = c.name === DEFAULT_COMPANY_NAME
                     return (
@@ -578,7 +580,8 @@ export default function ParametrosPage() {
                       </li>
                     )
                   })}
-                </ul>
+                  </ul>
+                </div>
               )
             })()}
           </section>
