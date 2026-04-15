@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Estilo padrão Veltrix — azul corporativo.
+  Empresas sem parametrização personalizada herdam estes valores.
+  EmpresaTheme sobrescreve as vars inline quando a empresa tem cores próprias;
+  ao voltar para uma empresa sem params, as vars inline são removidas e
+  o :root volta a valer automaticamente.
+*/
+:root {
+  /* Paleta primary (RGB separados por espaço — sintaxe do Tailwind) */
+  --veltrix-primary-50:  239 246 255;
+  --veltrix-primary-100: 219 234 254;
+  --veltrix-primary-200: 191 219 254;
+  --veltrix-primary-500:  59 130 246;
+  --veltrix-primary-600:  37  99 235;
+  --veltrix-primary-700:  29  78 216;
+  --veltrix-primary-800:  30  64 175;
+  --veltrix-primary-900:  30  58 138;
+
+  /* Cores semânticas */
+  --veltrix-cor-primaria:     #2563eb;
+  --veltrix-cor-secundaria:   #1e3a8a;
+  --veltrix-cor-fundo:        #f9fafb;
+  --veltrix-cor-texto:        #111827;
+  --veltrix-cor-botao:        #2563eb;
+  --veltrix-cor-botao-texto:  #ffffff;
+}
+
+@layer base {
+  body {
+    background-color: var(--veltrix-cor-fundo);
+    color: var(--veltrix-cor-texto);
+    @apply antialiased;
+  }
+}
+
+/* Números alinhados e legíveis (valores, qtd, totais) — uso no PDV e cupom */
+@layer utilities {
+  .font-numeric {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: var(--veltrix-cor-botao, #2563eb);
+    color: var(--veltrix-cor-botao-texto, #ffffff);
+    @apply hover:brightness-[0.93] font-semibold py-3 px-6 rounded-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-150;
+  }
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-150;
+  }
+  .input-field {
+    @apply w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+  }
+}

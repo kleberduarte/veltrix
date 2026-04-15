@@ -1,0 +1,83 @@
+'use client'
+import { useEffect, useState } from 'react'
+import AppLayout from '@/components/layout/AppLayout'
+import { pdvTerminalService } from '@/services/pdvTerminalService'
+import { PdvTerminal } from '@/types'
+import { useRouter } from 'next/navigation'
+import { isAuthenticated } from '@/lib/auth'
+
+function fmtHb(iso?: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('pt-BR')
+}
+
+export default function MonitorPdvPage() {
+  const router = useRouter()
+  const [list, setList] = useState<PdvTerminal[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!isAuthenticated()) { router.push('/login'); return }
+    let cancelled = false
+    async function tick() {
+      try {
+        const data = await pdvTerminalService.getAll()
+        if (!cancelled) setList(data)
+      } catch {
+        if (!cancelled) setList([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    tick()
+    const id = window.setInterval(tick, 8000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [router])
+
+  return (
+    <AppLayout title="Monitor de PDVs">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Lista atualizada a cada 8s — equivalente ao monitor de terminais da retaguarda legada.
+        </p>
+        {loading && list.length === 0 ? (
+          <p className="text-gray-400">Carregando...</p>
+        ) : (
+          <div className="card overflow-hidden p-0">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['Código', 'Nome', 'Status caixa', 'Ativo', 'Último operador', 'Heartbeat'].map(h => (
+                    <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {list.map(t => (
+                  <tr key={t.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-mono text-sm">{t.codigo}</td>
+                    <td className="px-6 py-4 font-medium">{t.nome}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${t.statusCaixa === 'OCUPADO' ? 'bg-amber-100 text-amber-900' : 'bg-gray-100 text-gray-700'}`}>
+                        {t.statusCaixa === 'OCUPADO' ? 'Ocupado' : 'Livre'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">{t.ativo ? 'Sim' : 'Não'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{t.ultimoOperador || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{fmtHb(t.ultimoHeartbeat)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {list.length === 0 && !loading && (
+              <p className="text-center text-gray-400 py-12">Nenhum terminal cadastrado.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  )
+}
