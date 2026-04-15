@@ -65,6 +65,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.getOnboardingInfo(token));
     }
 
+    @GetMapping("/company-access/{token}")
+    public ResponseEntity<CompanyAccessResponse> companyAccessInfo(@PathVariable String token) {
+        return ResponseEntity.ok(authService.getCompanyAccessInfo(token));
+    }
+
     @PostMapping("/onboarding/{token}")
     public ResponseEntity<AuthResponse> onboardingRegister(
             @PathVariable String token,

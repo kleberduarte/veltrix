@@ -53,7 +53,7 @@ export default function Header({ title }: { title: string }) {
   }, [])
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
+    <header className="relative z-30 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
       <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
       {user && (
         <div className="relative" ref={menuRef}>
@@ -78,7 +78,7 @@ export default function Header({ title }: { title: string }) {
           </button>
 
           <div
-            className={`absolute right-0 mt-3 w-[320px] rounded-2xl border border-gray-200 bg-white shadow-xl transition-all duration-150 ${open ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-1 pointer-events-none'}`}
+            className={`absolute right-0 z-50 mt-3 w-[320px] rounded-2xl border border-gray-200 bg-white shadow-xl transition-all duration-150 ${open ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-1 pointer-events-none'}`}
             role="menu"
           >
             <div className="px-5 py-4 border-b border-gray-100">

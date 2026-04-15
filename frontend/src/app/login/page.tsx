@@ -80,10 +80,10 @@ export default function LoginPage() {
             <div className="max-w-xl pb-8">
               <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Plataforma ERP + PDV</p>
               <h1 className="text-4xl font-extrabold leading-tight text-white xl:text-5xl">
-                Gestao moderna para vendas, atendimento e operacao.
+                Gestão moderna para vendas, atendimento e operação.
               </h1>
               <p className="mt-5 max-w-lg text-lg text-white/85">
-                Centralize produtos, clientes e pedidos em uma experiencia fluida e preparada para crescimento.
+                Centralize produtos, clientes e pedidos em uma experiência fluida e preparada para crescimento.
               </p>
             </div>
           </div>
@@ -128,14 +128,14 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Codigo de convite</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Código de convite</label>
                     <input
                       name="codigoConvite"
                       value={form.codigoConvite}
                       onChange={onChange}
                       required
                       className="input-field"
-                      placeholder="Codigo enviado pelo administrador"
+                      placeholder="Código enviado pelo administrador"
                     />
                   </div>
                 </>

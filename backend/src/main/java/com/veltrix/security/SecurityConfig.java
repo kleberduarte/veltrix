@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/onboarding/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/company-access/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/onboarding/**").permitAll()
                         .anyRequest().authenticated()
                 )

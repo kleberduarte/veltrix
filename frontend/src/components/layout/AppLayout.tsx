@@ -65,7 +65,7 @@ export default function AppLayout({
     <ParametroProvider>
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-visible">
           <Header title={title} />
           <main
             className={`flex-1 min-h-0 ${fullBleed ? 'flex flex-col overflow-y-auto overflow-x-hidden xl:overflow-hidden p-0' : 'overflow-y-auto p-8'}`}
