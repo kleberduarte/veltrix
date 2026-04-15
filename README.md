@@ -8,6 +8,11 @@ Sistema web de gestão para restaurantes, delivery e pequenos comércios (retagu
 - **Banco**: MySQL 8
 - **Frontend**: Next.js 14 + React 18 + Tailwind CSS
 
+## Branches
+
+- **`main`**: linha estável.
+- **`develop`**: integração do dia a dia; mudanças seguem para `main` via pull request.
+
 ---
 
 ## Pré-requisitos
