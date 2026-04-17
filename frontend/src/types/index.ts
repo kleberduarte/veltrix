@@ -220,6 +220,5 @@ export type CompanyOption = {
   id: number
   name: string
   systemDefault?: boolean
-  onboardingToken?: string | null
   accessToken?: string | null
 }

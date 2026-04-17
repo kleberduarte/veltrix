@@ -24,6 +24,14 @@ public class OrdemServicoController {
         return ResponseEntity.ok(service.findAll());
     }
 
+    /** Autocomplete: valores distintos já gravados em OS (por empresa). */
+    @GetMapping("/sugestoes")
+    public ResponseEntity<List<String>> sugestoes(
+            @RequestParam String campo,
+            @RequestParam(required = false, defaultValue = "") String q) {
+        return ResponseEntity.ok(service.sugestoes(campo, q));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<OrdemServicoResponse> findById(@PathVariable Long id) {
         return ResponseEntity.ok(service.findById(id));

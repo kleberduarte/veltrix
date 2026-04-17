@@ -31,8 +31,8 @@ export default function Header({ title }: { title: string }) {
 
   function handleLogout() {
     setOpen(false)
-    authService.logout()
-    router.push('/login')
+    const redirectPath = authService.logout()
+    router.push(redirectPath)
   }
 
   useEffect(() => {

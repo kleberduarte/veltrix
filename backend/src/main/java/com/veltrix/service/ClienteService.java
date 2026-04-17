@@ -7,8 +7,10 @@ import com.veltrix.security.TenantContext;
 import com.veltrix.util.CpfValidator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -104,6 +106,15 @@ public class ClienteService {
         Cliente cliente = clienteRepository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
         clienteRepository.delete(cliente);
+    }
+
+    @Transactional
+    public void deleteAllFromCurrentCompany() {
+        Long companyId = TenantContext.getCompanyId();
+        if (companyId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida.");
+        }
+        clienteRepository.deleteByCompanyId(companyId);
     }
 
     @Transactional

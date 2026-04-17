@@ -37,6 +37,10 @@ export const clienteService = {
     await api.delete(`/clientes/${id}`)
   },
 
+  async removeAll(): Promise<void> {
+    await api.delete('/clientes')
+  },
+
   async regenerarConvite(id: number): Promise<{ codigo: string }> {
     const { data } = await api.post(`/clientes/${id}/regenerar-convite`)
     return data

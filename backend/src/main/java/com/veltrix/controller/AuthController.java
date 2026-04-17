@@ -1,8 +1,6 @@
 package com.veltrix.controller;
 
 import com.veltrix.dto.auth.*;
-import com.veltrix.dto.auth.OnboardingInfoResponse;
-import com.veltrix.dto.auth.RegisterAdminRequest;
 import com.veltrix.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +27,16 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    @PostMapping("/email-status")
+    public ResponseEntity<EmailStatusResponse> emailStatus(@Valid @RequestBody EmailLookupRequest request) {
+        return ResponseEntity.ok(authService.getEmailStatus(request));
+    }
+
+    @PostMapping("/definir-senha-inicial")
+    public ResponseEntity<AuthResponse> definirSenhaInicial(@Valid @RequestBody SetupInitialPasswordRequest request) {
+        return ResponseEntity.ok(authService.setupInitialPassword(request));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<MeResponse> me(Authentication auth) {
         return ResponseEntity.ok(authService.getMe(auth.getName()));
@@ -50,31 +58,9 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/companies/{id}/onboarding")
-    public ResponseEntity<CompanySummaryResponse> getCompanyOnboarding(@PathVariable Long id) {
-        return ResponseEntity.ok(authService.getCompanyOnboarding(id));
-    }
-
-    @PostMapping("/companies/{id}/onboarding")
-    public ResponseEntity<CompanySummaryResponse> regenerateOnboarding(@PathVariable Long id) {
-        return ResponseEntity.ok(authService.regenerateOnboardingToken(id));
-    }
-
-    @GetMapping("/onboarding/{token}")
-    public ResponseEntity<OnboardingInfoResponse> onboardingInfo(@PathVariable String token) {
-        return ResponseEntity.ok(authService.getOnboardingInfo(token));
-    }
-
     @GetMapping("/company-access/{token}")
     public ResponseEntity<CompanyAccessResponse> companyAccessInfo(@PathVariable String token) {
         return ResponseEntity.ok(authService.getCompanyAccessInfo(token));
-    }
-
-    @PostMapping("/onboarding/{token}")
-    public ResponseEntity<AuthResponse> onboardingRegister(
-            @PathVariable String token,
-            @Valid @RequestBody RegisterAdminRequest request) {
-        return ResponseEntity.ok(authService.registerViaOnboarding(token, request));
     }
 
     @PostMapping("/switch-company")
@@ -106,6 +92,13 @@ public class AuthController {
     public ResponseEntity<AuthResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request,
                                                         Authentication auth) {
         return ResponseEntity.ok(authService.changePassword(request, auth.getName()));
+    }
+
+    @PostMapping("/primeira-senha-convite")
+    public ResponseEntity<AuthResponse> definirPrimeiraSenhaConvite(
+            @Valid @RequestBody PrimeiraSenhaConviteRequest request,
+            Authentication auth) {
+        return ResponseEntity.ok(authService.definirPrimeiraSenhaConvite(request, auth.getName()));
     }
 
     @GetMapping("/users")

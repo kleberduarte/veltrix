@@ -8,9 +8,8 @@ import {
   UpdateUserPayload,
   CreateUserResponse,
 } from '@/services/userService'
-import { pdvTerminalService } from '@/services/pdvTerminalService'
 import { authService } from '@/services/authService'
-import { AppUser, CompanyOption, PdvTerminal, Role } from '@/types'
+import { AppUser, CompanyOption, Role } from '@/types'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
 import { ROLE_LABELS } from '@/lib/roleAccess'
@@ -53,7 +52,6 @@ export default function UsuariosPage() {
 
   const [list, setList] = useState<AppUser[]>([])
   const [companies, setCompanies] = useState<CompanyOption[]>([])
-  const [terminais, setTerminais] = useState<PdvTerminal[]>([])
   const [loading, setLoading] = useState(true)
 
   const [showCreate, setShowCreate] = useState(false)
@@ -65,13 +63,13 @@ export default function UsuariosPage() {
     telefone: '',
     mustChangePassword: false,
     companyId: undefined,
-    pdvTerminalId: undefined,
   })
   const [gerarSenhaAuto, setGerarSenhaAuto] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null)
   const [senhaGeradaSec, setSenhaGeradaSec] = useState(0)
+  const [senhaCopiada, setSenhaCopiada] = useState(false)
 
   const [editId, setEditId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<UpdateUserPayload & { name: string; email: string }>({
@@ -81,11 +79,8 @@ export default function UsuariosPage() {
     password: '',
     telefone: '',
     companyId: undefined,
-    pdvTerminalId: undefined,
-    desvincularPdv: false,
     aplicarTelefone: true,
   })
-  const [editTerminais, setEditTerminais] = useState<PdvTerminal[]>([])
 
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleteName, setDeleteName] = useState('')
@@ -101,18 +96,33 @@ export default function UsuariosPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      const auth = getAuth()
+      setMe(auth)
       const [u, c] = await Promise.all([
         userService.list(),
         userService.listCompanies().catch(() => [] as CompanyOption[]),
       ])
       setList(u)
       setCompanies(c)
-      setConviteEmpresaId(me?.companyId ?? null)
-      setConviteNome(me?.companyName || '')
+      setConviteEmpresaId(auth?.companyId ?? null)
+      setConviteNome(auth?.companyName || '')
+      try {
+        const inv = await authService.getPdvInvite()
+        if (inv.codigo) {
+          setConviteCodigo(inv.codigo)
+          setConviteNome(inv.companyName || auth?.companyName || '')
+          setConviteEmpresaId(inv.companyId ?? auth?.companyId ?? null)
+          setConviteSec(0)
+        } else {
+          setConviteCodigo('')
+        }
+      } catch {
+        setConviteCodigo('')
+      }
     } finally {
       setLoading(false)
     }
-  }, [me?.companyId, me?.companyName])
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -127,45 +137,17 @@ export default function UsuariosPage() {
   }, [router, load])
 
   useEffect(() => {
+    const onAuth = () => void load()
+    window.addEventListener('veltrix-auth-changed', onAuth)
+    return () => window.removeEventListener('veltrix-auth-changed', onAuth)
+  }, [load])
+
+  useEffect(() => {
     if (!isAdm || !companies.length || createForm.companyId) return
     const uid = getAuth()?.companyId
     const match = uid && companies.some(c => c.id === uid)
     setCreateForm(f => ({ ...f, companyId: match ? uid : companies[0].id }))
   }, [isAdm, companies, createForm.companyId])
-
-  const empresaAlvoCriacao = useMemo(() => {
-    if (isAdm && createForm.companyId) return createForm.companyId
-    return me?.companyId ?? undefined
-  }, [isAdm, createForm.companyId, me?.companyId])
-
-  useEffect(() => {
-    if (!empresaAlvoCriacao) {
-      setTerminais([])
-      return
-    }
-    pdvTerminalService
-      .listByEmpresa(empresaAlvoCriacao)
-      .then(setTerminais)
-      .catch(() => setTerminais([]))
-  }, [empresaAlvoCriacao, showCreate])
-
-  const editEmpresaId = useMemo(() => {
-    if (editId == null) return null
-    if (isAdm && editForm.companyId) return editForm.companyId
-    const u = list.find(x => x.id === editId)
-    return u?.companyId ?? null
-  }, [editId, list, isAdm, editForm.companyId])
-
-  useEffect(() => {
-    if (!editEmpresaId || editId == null) {
-      setEditTerminais([])
-      return
-    }
-    pdvTerminalService
-      .listByEmpresa(editEmpresaId)
-      .then(setEditTerminais)
-      .catch(() => setEditTerminais([]))
-  }, [editEmpresaId, editId])
 
   useEffect(() => {
     if (!senhaGerada || senhaGeradaSec <= 0) return
@@ -216,7 +198,6 @@ export default function UsuariosPage() {
             ? gerarSenhaAuto
             : (gerarSenhaAuto ? true : createForm.mustChangePassword),
         companyId: isAdm ? createForm.companyId : undefined,
-        pdvTerminalId: createForm.pdvTerminalId,
       }
       if (!gerarSenhaAuto) {
         if (!createForm.password || createForm.password.length < 4) {
@@ -230,6 +211,7 @@ export default function UsuariosPage() {
       if (data.senhaTemporaria) {
         setSenhaGerada(data.senhaTemporaria)
         setSenhaGeradaSec(120)
+        setSenhaCopiada(false)
       }
       setShowCreate(false)
       setCreateForm({
@@ -240,7 +222,6 @@ export default function UsuariosPage() {
         telefone: '',
         mustChangePassword: false,
         companyId: isAdm ? createForm.companyId : undefined,
-        pdvTerminalId: undefined,
       })
       setGerarSenhaAuto(true)
       await load()
@@ -261,8 +242,6 @@ export default function UsuariosPage() {
       password: '',
       telefone: u.telefone ?? '',
       companyId: isAdm ? u.companyId : undefined,
-      pdvTerminalId: u.pdvTerminalId ?? undefined,
-      desvincularPdv: false,
       aplicarTelefone: true,
     })
   }
@@ -281,8 +260,6 @@ export default function UsuariosPage() {
         telefone: editForm.telefone?.trim() || null,
         aplicarTelefone: true,
         companyId: isAdm ? editForm.companyId : undefined,
-        pdvTerminalId: editForm.desvincularPdv ? null : editForm.pdvTerminalId,
-        desvincularPdv: editForm.desvincularPdv,
       }
       await userService.update(editId, payload)
       setEditId(null)
@@ -349,8 +326,15 @@ export default function UsuariosPage() {
     }
   }
 
-  function copiarSenha() {
-    if (senhaGerada) navigator.clipboard.writeText(senhaGerada).catch(() => {})
+  async function copiarSenha() {
+    if (!senhaGerada) return
+    try {
+      await navigator.clipboard.writeText(senhaGerada)
+      setSenhaCopiada(true)
+      window.setTimeout(() => setSenhaCopiada(false), 2000)
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
@@ -360,7 +344,7 @@ export default function UsuariosPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Equipe e permissões</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Cadastro, edição e vínculo com empresa e terminal PDV — alinhado ao sistema legado.
+              Cadastro e edição de usuários com vínculo de empresa.
             </p>
           </div>
           <button type="button" onClick={() => { setError(''); setShowCreate(true) }} className="btn-primary shrink-0">
@@ -369,16 +353,70 @@ export default function UsuariosPage() {
         </div>
 
         {senhaGerada && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium">Senha provisória gerada — copie e envie com segurança.</span>
-              <span className="text-xs text-amber-800">{senhaGeradaSec > 0 ? `Ocultando em ${senhaGeradaSec}s` : ''}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <code className="rounded-lg bg-white px-3 py-2 font-mono text-base border border-amber-200">{senhaGerada}</code>
-              <button type="button" onClick={copiarSenha} className="btn-secondary text-sm">
-                Copiar
-              </button>
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/[0.06] ring-1 ring-slate-900/5">
+            <div
+              className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary-500 via-primary-600 to-primary-800"
+              aria-hidden
+            />
+            <div className="relative pl-5 pr-4 py-5 sm:pl-7">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex gap-3.5 min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500/15 to-primary-700/10 text-primary-700 ring-1 ring-primary-600/10">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor" aria-hidden>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-[15px] font-semibold tracking-tight text-slate-900">Senha provisória gerada</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-[13px]">
+                      Copie agora e envie por um canal seguro. A senha some desta tela automaticamente.
+                    </p>
+                  </div>
+                </div>
+                {senhaGeradaSec > 0 && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold tabular-nums text-slate-600 ring-1 ring-slate-200/80">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-40" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-500" />
+                    </span>
+                    Oculta em {senhaGeradaSec}s
+                  </span>
+                )}
+              </div>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                <div className="min-w-0 flex-1 rounded-xl bg-slate-50/90 px-4 py-3.5 font-mono text-[15px] font-medium tracking-wide text-slate-900 shadow-inner ring-1 ring-inset ring-slate-200/90 sm:text-base">
+                  {senhaGerada}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void copiarSenha()}
+                  className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold transition-all sm:min-w-[7.5rem] ${
+                    senhaCopiada
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+                      : 'bg-primary-600 text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 hover:shadow-primary-700/25'
+                  }`}
+                >
+                  {senhaCopiada ? (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4 opacity-90" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                      </svg>
+                      Copiar
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -550,7 +588,6 @@ export default function UsuariosPage() {
                         setCreateForm({
                           ...createForm,
                           companyId: e.target.value ? Number(e.target.value) : undefined,
-                          pdvTerminalId: undefined,
                         })
                       }
                       className="input-field"
@@ -597,31 +634,6 @@ export default function UsuariosPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Terminal PDV (opcional)</label>
-                  <select
-                    value={createForm.pdvTerminalId ?? ''}
-                    onChange={e =>
-                      setCreateForm({
-                        ...createForm,
-                        pdvTerminalId: e.target.value ? Number(e.target.value) : undefined,
-                      })
-                    }
-                    className="input-field"
-                  >
-                    <option value="">— Nenhum —</option>
-                    {terminais.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.codigo} — {t.nome}
-                      </option>
-                    ))}
-                  </select>
-                  {createForm.role === 'VENDEDOR' && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Sem seleção, um terminal é criado automaticamente e aparece em Terminais PDV.
-                    </p>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
@@ -715,7 +727,6 @@ export default function UsuariosPage() {
                         setEditForm({
                           ...editForm,
                           companyId: e.target.value ? Number(e.target.value) : undefined,
-                          pdvTerminalId: undefined,
                         })
                       }
                       className="input-field"
@@ -760,43 +771,6 @@ export default function UsuariosPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Terminal PDV</label>
-                  <select
-                    value={editForm.desvincularPdv ? '' : editForm.pdvTerminalId ?? ''}
-                    onChange={e => {
-                      const v = e.target.value
-                      setEditForm({
-                        ...editForm,
-                        desvincularPdv: false,
-                        pdvTerminalId: v ? Number(v) : undefined,
-                      })
-                    }}
-                    disabled={editForm.desvincularPdv}
-                    className="input-field"
-                  >
-                    <option value="">— Nenhum —</option>
-                    {editTerminais.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.codigo} — {t.nome}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={editForm.desvincularPdv}
-                      onChange={e =>
-                        setEditForm({
-                          ...editForm,
-                          desvincularPdv: e.target.checked,
-                          pdvTerminalId: e.target.checked ? undefined : editForm.pdvTerminalId,
-                        })
-                      }
-                    />
-                    Desvincular terminal PDV
-                  </label>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>

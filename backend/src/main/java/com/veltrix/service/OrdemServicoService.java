@@ -10,6 +10,8 @@ import com.veltrix.repository.ParametroEmpresaRepository;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class OrdemServicoService {
 
+    private static final Pageable SUGESTOES_PAGE = PageRequest.of(0, 40);
+
     private final OrdemServicoRepository repository;
     private final ParametroEmpresaRepository parametroEmpresaRepository;
     private final CompanyRepository companyRepository;
@@ -38,6 +42,28 @@ public class OrdemServicoService {
             StatusOrdemServico.ENTREGUE,              Set.of(),
             StatusOrdemServico.CANCELADA,             Set.of()
     );
+
+    /**
+     * Valores distintos já usados em OS da empresa (histórico para autocomplete).
+     */
+    public List<String> sugestoes(String campo, String q) {
+        assertOrdemServicoEnabledForCurrentCompany();
+        Long cid = TenantContext.getCompanyId();
+        String needle = q == null ? "" : q.trim();
+        String key = campo == null ? "" : campo.trim();
+        return switch (key) {
+            case "nomeCliente" -> repository.sugestoesNomeCliente(cid, needle, SUGESTOES_PAGE);
+            case "telefoneCliente" -> repository.sugestoesTelefoneCliente(cid, needle, SUGESTOES_PAGE);
+            case "contatoCliente" -> repository.sugestoesContatoCliente(cid, needle, SUGESTOES_PAGE);
+            case "equipamento" -> repository.sugestoesEquipamento(cid, needle, SUGESTOES_PAGE);
+            case "marca" -> repository.sugestoesMarca(cid, needle, SUGESTOES_PAGE);
+            case "modelo" -> repository.sugestoesModelo(cid, needle, SUGESTOES_PAGE);
+            case "numeroSerie" -> repository.sugestoesNumeroSerie(cid, needle, SUGESTOES_PAGE);
+            case "tecnicoResponsavel" -> repository.sugestoesTecnicoResponsavel(cid, needle, SUGESTOES_PAGE);
+            case "acessorios" -> repository.sugestoesAcessorios(cid, needle, SUGESTOES_PAGE);
+            default -> List.of();
+        };
+    }
 
     public List<OrdemServicoResponse> findAll() {
         assertOrdemServicoEnabledForCurrentCompany();

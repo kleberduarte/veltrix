@@ -13,9 +13,10 @@ public class RegisterRequest {
     @NotBlank
     private String name;
 
-    @NotBlank @Size(min = 4)
+    /** Opcional no convite PDV: vazio = senha definida na tela /primeiro-acesso. */
     private String password;
 
+    @NotBlank
     @Size(max = 40)
     private String codigoConvite;
 }

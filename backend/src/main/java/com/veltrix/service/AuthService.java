@@ -66,19 +66,26 @@ public class AuthService {
         Company company = companyRepository.findByPdvInviteCodeIgnoreCase(code)
                 .orElseThrow(() -> new IllegalArgumentException("Código de convite inválido ou expirado. Solicite um novo código ao administrador."));
 
+        boolean definirSenhaSóNoPrimeiroAcesso = !StringUtils.hasText(request.getPassword());
+        if (!definirSenhaSóNoPrimeiroAcesso && request.getPassword().length() < 4) {
+            throw new IllegalArgumentException("Senha deve ter pelo menos 4 caracteres.");
+        }
+        String senhaInterna = definirSenhaSóNoPrimeiroAcesso
+                ? passwordEncoder.encode(UUID.randomUUID().toString() + UUID.randomUUID())
+                : passwordEncoder.encode(request.getPassword());
+
         User user = userRepository.save(User.builder()
                 .company(company)
                 .name(request.getName().trim())
                 .email(normalizeEmail(request.getEmail()))
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(senhaInterna)
                 .telefone(null)
                 .role(Role.VENDEDOR)
-                .mustChangePassword(false)
+                .mustChangePassword(true)
+                .inviteSelfRegistration(definirSenhaSóNoPrimeiroAcesso)
                 .build());
         company.setPdvInviteCode(null);
         companyRepository.save(company);
-
-        pdvTerminalService.ensureAndLinkTerminalForUsuario(company.getId(), user);
 
         String token = jwtUtil.generateToken(user.getId(), company.getId(), user.getEmail(), user.getRole().name());
         return buildResponse(token, user, company);
@@ -97,11 +104,53 @@ public class AuthService {
                     "Administradores de empresa não podem acessar a empresa reservada (Default).");
         }
 
-        if (user.getPdvTerminal() == null) {
-            pdvTerminalService.ensureAndLinkTerminalForUsuario(user.getCompany().getId(), user);
-            user = userRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
+        String token = jwtUtil.generateToken(user.getId(), user.getCompany().getId(), user.getEmail(), user.getRole().name());
+        return buildResponse(token, user, user.getCompany());
+    }
+
+    @Transactional(readOnly = true)
+    public EmailStatusResponse getEmailStatus(EmailLookupRequest request) {
+        String email = normalizeEmail(request.getEmail());
+        if (!StringUtils.hasText(email)) {
+            throw new IllegalArgumentException("Informe um e-mail válido.");
         }
+        return userRepository.findByEmail(email)
+                .map(u -> EmailStatusResponse.builder()
+                        .exists(true)
+                        .requiresPasswordSetup(Boolean.TRUE.equals(u.getMustChangePassword()))
+                        .build())
+                .orElse(EmailStatusResponse.builder()
+                        .exists(false)
+                        .requiresPasswordSetup(false)
+                        .build());
+    }
+
+    /**
+     * Usuário já cadastrado com {@link User#getMustChangePassword()} true: valida a senha provisória e define a definitiva em um único passo.
+     */
+    @Transactional
+    public AuthResponse setupInitialPassword(SetupInitialPasswordRequest request) {
+        String email = normalizeEmail(request.getEmail());
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("E-mail não cadastrado."));
+
+        if (!Boolean.TRUE.equals(user.getMustChangePassword())) {
+            throw new IllegalArgumentException(
+                    "Este e-mail já possui senha definida. Use sua senha na etapa de acesso.");
+        }
+
+        if (user.getRole() == Role.ADMIN_EMPRESA && isEmpresaReservadaAdminEmpresa(user.getCompany())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Administradores de empresa não podem acessar a empresa reservada (Default).");
+        }
+
+        if (!passwordEncoder.matches(request.getSenhaProvisoria(), user.getPassword())) {
+            throw new IllegalArgumentException("Senha provisória incorreta.");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNovaSenha()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getId(), user.getCompany().getId(), user.getEmail(), user.getRole().name());
         return buildResponse(token, user, user.getCompany());
@@ -166,10 +215,6 @@ public class AuthService {
                 .pdvTerminal(terminal)
                 .build());
 
-        if (request.getRole() == Role.VENDEDOR && user.getPdvTerminal() == null) {
-            pdvTerminalService.ensureAndLinkTerminalForUsuario(company.getId(), user);
-        }
-
         return toCreateUserResponse(user, gerada ? plain : null);
     }
 
@@ -177,6 +222,10 @@ public class AuthService {
     public AuthResponse changePassword(ChangePasswordRequest request, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+
+        if (Boolean.TRUE.equals(user.getInviteSelfRegistration())) {
+            throw new IllegalArgumentException("Use a tela de primeiro acesso para definir sua senha de convite.");
+        }
 
         if (!passwordEncoder.matches(request.getSenhaAtual(), user.getPassword())) {
             throw new IllegalArgumentException("Senha atual incorreta");
@@ -189,27 +238,43 @@ public class AuthService {
         return buildResponse(token, user, user.getCompany());
     }
 
+    /**
+     * Primeiro acesso após cadastro com convite PDV (sem senha no formulário): define a senha definitiva.
+     */
+    @Transactional
+    public AuthResponse definirPrimeiraSenhaConvite(PrimeiraSenhaConviteRequest request, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        if (!Boolean.TRUE.equals(user.getMustChangePassword()) || !Boolean.TRUE.equals(user.getInviteSelfRegistration())) {
+            throw new IllegalArgumentException("Esta operação não se aplica ao seu usuário.");
+        }
+        if (request.getNovaSenha().length() < 6) {
+            throw new IllegalArgumentException("A nova senha deve ter pelo menos 6 caracteres.");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNovaSenha()));
+        user.setMustChangePassword(false);
+        user.setInviteSelfRegistration(false);
+        userRepository.save(user);
+
+        String token = jwtUtil.generateToken(user.getId(), user.getCompany().getId(), user.getEmail(), user.getRole().name());
+        return buildResponse(token, user, user.getCompany());
+    }
+
     @Transactional
     public MeResponse getMe(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
         Company company = resolveTenantCompany(user);
-        Long tenantId = TenantContext.getCompanyId();
-        if (tenantId != null
-                && tenantId.equals(user.getCompany().getId())
-                && user.getPdvTerminal() == null) {
-            pdvTerminalService.ensureAndLinkTerminalForUsuario(tenantId, user);
-            user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
-        }
         return MeResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .companyId(company.getId())
                 .companyName(company.getName())
+                .accessToken(company.getAccessToken())
                 .role(user.getRole().name())
                 .mustChangePassword(user.getMustChangePassword())
+                .inviteSelfRegistration(Boolean.TRUE.equals(user.getInviteSelfRegistration()))
                 .telefone(user.getTelefone())
                 .pdvTerminalId(user.getPdvTerminal() != null ? user.getPdvTerminal().getId() : null)
                 .pdvTerminalCodigo(user.getPdvTerminal() != null ? user.getPdvTerminal().getCodigo() : null)
@@ -228,15 +293,12 @@ public class AuthService {
     }
 
     public List<UserResponse> listUsers() {
-        User current = getCurrentUser();
-        List<User> list;
-        if (current.getRole() == Role.ADM) {
-            list = userRepository.findAll().stream()
-                    .sorted(Comparator.comparing(User::getId))
-                    .toList();
-        } else {
-            list = userRepository.findByCompany_IdOrderByIdAsc(TenantContext.getCompanyId());
+        getCurrentUser();
+        Long cid = TenantContext.getCompanyId();
+        if (cid == null) {
+            throw new IllegalStateException("Contexto de empresa não definido.");
         }
+        List<User> list = userRepository.findByCompany_IdOrderByIdAsc(cid);
         return list.stream().map(this::toUserResponse2).toList();
     }
 
@@ -245,12 +307,11 @@ public class AuthService {
         if (current.getRole() == Role.ADM) {
             return companyRepository.findAll().stream()
                     .map(c -> {
-                        String onboardingToken = isEmpresaReservada(c) ? null : c.getOnboardingToken();
                         String accessToken = isEmpresaReservada(c) ? null : c.getAccessToken();
                         return new CompanySummaryResponse(
                                 c.getId(), c.getName(),
                                 Boolean.TRUE.equals(c.getSystemDefault()),
-                                onboardingToken, accessToken);
+                                accessToken);
                     })
                     .sorted(Comparator.comparing(CompanySummaryResponse::getName))
                     .toList();
@@ -259,10 +320,21 @@ public class AuthService {
         return List.of(new CompanySummaryResponse(c.getId(), c.getName(), Boolean.TRUE.equals(c.getSystemDefault())));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Retorna o código de convite PDV da empresa atual; cria um se ainda não existir (exceto empresa reservada).
+     */
+    @Transactional
     public PdvInviteResponse getPdvInviteCode() {
         User current = getCurrentUser();
         Company company = resolveTenantCompany(current);
+        if (!isEmpresaReservada(company) && !StringUtils.hasText(company.getPdvInviteCode())) {
+            company.setPdvInviteCode(gerarCodigoConvite());
+            company = companyRepository.save(company);
+        }
+        return buildPdvInviteResponse(company);
+    }
+
+    private static PdvInviteResponse buildPdvInviteResponse(Company company) {
         return PdvInviteResponse.builder()
                 .companyId(company.getId())
                 .companyName(company.getName())
@@ -394,11 +466,19 @@ public class AuthService {
     }
 
     private void assertCanManageUser(User current, User target) {
+        Long tid = TenantContext.getCompanyId();
+        if (tid == null) {
+            throw new IllegalStateException("Contexto de empresa não definido.");
+        }
         if (current.getRole() == Role.ADM) {
+            if (!target.getCompany().getId().equals(tid)) {
+                throw new IllegalStateException(
+                        "Altere o contexto da empresa no menu para gerenciar este usuário.");
+            }
             return;
         }
         if (current.getRole() == Role.ADMIN_EMPRESA) {
-            if (!target.getCompany().getId().equals(current.getCompany().getId())) {
+            if (!target.getCompany().getId().equals(tid)) {
                 throw new IllegalStateException("Sem permissão para alterar usuário de outra empresa.");
             }
             return;
@@ -448,10 +528,6 @@ public class AuthService {
         return sb.toString();
     }
 
-    private static String gerarOnboardingToken() {
-        return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
-    }
-
     private static String gerarAccessToken() {
         return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
     }
@@ -489,8 +565,10 @@ public class AuthService {
                 .email(user.getEmail())
                 .companyId(company.getId())
                 .companyName(company.getName())
+                .accessToken(company.getAccessToken())
                 .role(user.getRole().name())
                 .mustChangePassword(user.getMustChangePassword())
+                .inviteSelfRegistration(Boolean.TRUE.equals(user.getInviteSelfRegistration()))
                 .build();
     }
 
@@ -563,11 +641,12 @@ public class AuthService {
                 .plan("FREE")
                 .systemDefault(false)
                 .pdvInviteCode(gerarCodigoConvite())
-                .onboardingToken(gerarOnboardingToken())
                 .accessToken(gerarAccessToken())
                 .build());
         seedParametrosPadrao(c.getId(), n);
-        return new CompanySummaryResponse(c.getId(), c.getName(), false, c.getOnboardingToken(), c.getAccessToken());
+        CompanySummaryResponse resp = new CompanySummaryResponse(c.getId(), c.getName(), false, c.getAccessToken());
+        resp.setPdvInviteCode(c.getPdvInviteCode());
+        return resp;
     }
 
     /**
@@ -615,96 +694,6 @@ public class AuthService {
 
         // 7. Empresa
         companyRepository.delete(company);
-    }
-
-    // ── Onboarding ────────────────────────────────────────────────────────────
-
-    /** Retorna informações públicas da empresa a partir do token de onboarding (sem autenticação). */
-    @Transactional(readOnly = true)
-    public OnboardingInfoResponse getOnboardingInfo(String token) {
-        Company c = companyRepository.findByOnboardingToken(token)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Link de onboarding inválido ou já utilizado."));
-        if (isEmpresaReservada(c)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de onboarding inválido ou já utilizado.");
-        }
-
-        // Busca branding; usa defaults se ainda não configurado
-        var parametro = parametroEmpresaRepository.findByCompanyId(c.getId()).orElse(null);
-        String nomeEmpresa  = parametro != null && parametro.getNomeEmpresa() != null ? parametro.getNomeEmpresa() : c.getName();
-        String logoUrl      = parametro != null ? parametro.getLogoUrl()      : null;
-        String corPrimaria  = parametro != null && parametro.getCorPrimaria()  != null ? parametro.getCorPrimaria()  : "#2563eb";
-        String corSecundaria= parametro != null && parametro.getCorSecundaria()!= null ? parametro.getCorSecundaria(): "#1e3a8a";
-        String corBotao     = parametro != null && parametro.getCorBotao()     != null ? parametro.getCorBotao()     : "#2563eb";
-        String corBotaoTexto= parametro != null && parametro.getCorBotaoTexto()!= null ? parametro.getCorBotaoTexto(): "#ffffff";
-
-        return new OnboardingInfoResponse(c.getId(), c.getName(),
-                nomeEmpresa, logoUrl, corPrimaria, corSecundaria, corBotao, corBotaoTexto);
-    }
-
-    /** Registra o primeiro ADMIN_EMPRESA via link de onboarding. O token é invalidado após uso. */
-    @Transactional
-    public AuthResponse registerViaOnboarding(String token, RegisterAdminRequest request) {
-        Company c = companyRepository.findByOnboardingToken(token)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Link de onboarding inválido ou já utilizado."));
-        if (isEmpresaReservada(c)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link de onboarding inválido ou já utilizado.");
-        }
-
-        String email = normalizeEmail(request.getEmail());
-        if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("Este e-mail já está em uso.");
-        }
-
-        User user = userRepository.save(User.builder()
-                .company(c)
-                .name(request.getName().trim())
-                .email(email)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.ADMIN_EMPRESA)
-                .mustChangePassword(false)
-                .telefone(request.getTelefone() != null ? request.getTelefone().trim() : null)
-                .build());
-
-        // Invalida o token — uso único
-        c.setOnboardingToken(null);
-        companyRepository.save(c);
-
-        String jwtToken = jwtUtil.generateToken(user.getId(), c.getId(), user.getEmail(), user.getRole().name());
-        return buildResponse(jwtToken, user, c);
-    }
-
-    /** Retorna o token de onboarding de uma empresa (somente ADM Global). */
-    @Transactional(readOnly = true)
-    public CompanySummaryResponse getCompanyOnboarding(Long companyId) {
-        User current = getCurrentUser();
-        if (current.getRole() != Role.ADM) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas administrador global pode acessar tokens de onboarding.");
-        }
-        Company c = companyRepository.findById(companyId)
-                .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada"));
-        if (isEmpresaReservada(c)) {
-            return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), null, null);
-        }
-        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken(), c.getAccessToken());
-    }
-
-    /** Regenera o token de onboarding de uma empresa (somente ADM Global). */
-    @Transactional
-    public CompanySummaryResponse regenerateOnboardingToken(Long companyId) {
-        User current = getCurrentUser();
-        if (current.getRole() != Role.ADM) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas administrador global pode regenerar tokens de onboarding.");
-        }
-        Company c = companyRepository.findById(companyId)
-                .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada"));
-        if (isEmpresaReservada(c)) {
-            throw new IllegalArgumentException("A empresa padrão do sistema não possui onboarding.");
-        }
-        c.setOnboardingToken(gerarOnboardingToken());
-        companyRepository.save(c);
-        return new CompanySummaryResponse(c.getId(), c.getName(), c.getSystemDefault(), c.getOnboardingToken(), c.getAccessToken());
     }
 
     /** Retorna branding público para a URL exclusiva de acesso da empresa. */

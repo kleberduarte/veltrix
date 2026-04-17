@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { clienteService, ClientePayload } from '@/services/clienteService'
 import { Cliente } from '@/types'
@@ -35,6 +35,16 @@ type FormState = {
   uf: string
   enderecoManual: string
 }
+
+type ImportProgress = {
+  total: number
+  processed: number
+  success: number
+  failed: number
+  currentName: string
+}
+
+type CsvRow = Record<string, string>
 
 function buildEnderecoCep(f: FormState): string {
   const d = onlyDigits(f.cepDisplay)
@@ -157,6 +167,15 @@ export default function ClientesPage() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<ApiFieldErrors>({})
   const [conviteMsg, setConviteMsg] = useState('')
+  const [importRows, setImportRows] = useState<ClientePayload[]>([])
+  const [importFileName, setImportFileName] = useState('')
+  const [importError, setImportError] = useState('')
+  const [importRunning, setImportRunning] = useState(false)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState('')
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -368,10 +387,195 @@ export default function ClientesPage() {
   const cepDigits = onlyDigits(form.cepDisplay)
   const showCepFields = !form.enderecoSemCep && cepDigits.length === 8 && form.cepOk
 
+  function normalizeHeader(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+  }
+
+  function parseCsvLine(line: string, separator: string) {
+    const values: string[] = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i]
+      const next = line[i + 1]
+
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          current += '"'
+          i += 1
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === separator && !inQuotes) {
+        values.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+
+    values.push(current.trim())
+    return values
+  }
+
+  function parseCsv(content: string): CsvRow[] {
+    const lines = content
+      .replace(/^\uFEFF/, '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+
+    if (lines.length < 2) return []
+    const separator = lines[0].includes(';') ? ';' : ','
+    const headers = parseCsvLine(lines[0], separator).map(normalizeHeader)
+
+    return lines.slice(1).map((line) => {
+      const values = parseCsvLine(line, separator)
+      return headers.reduce<CsvRow>((acc, header, index) => {
+        acc[header] = (values[index] || '').replace(/^"|"$/g, '').trim()
+        return acc
+      }, {})
+    })
+  }
+
+  function rowValue(row: CsvRow, keys: string[]) {
+    for (const key of keys) {
+      if (row[key]) return row[key]
+    }
+    return ''
+  }
+
+  function mapRowToClientePayload(row: CsvRow): ClientePayload | null {
+    const nome = rowValue(row, ['nome', 'name', 'cliente'])
+    const email = rowValue(row, ['email', 'mail', 'e-mail']).toLowerCase()
+    const telefone = onlyDigits(rowValue(row, ['telefone', 'phone', 'celular']))
+    const cpf = onlyDigits(rowValue(row, ['cpf', 'documento']))
+
+    if (!nome || !email || !telefone || !cpf) return null
+    if (telefone.length < 8 || cpf.length !== 11 || !isValidCpfDigits(cpf)) return null
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
+
+    const cep = onlyDigits(rowValue(row, ['cep']))
+    const endereco = rowValue(row, ['endereco', 'endereço', 'logradouro'])
+
+    const payload: ClientePayload = {
+      nome,
+      email,
+      telefone,
+      cpf,
+    }
+
+    if (cep.length === 8) payload.cep = cep
+    if (endereco) payload.endereco = endereco
+
+    return payload
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportError('')
+    setImportProgress(null)
+    setImportRows([])
+    setImportFileName(file.name)
+
+    try {
+      const content = await file.text()
+      const rows = parseCsv(content)
+      const mapped = rows.map(mapRowToClientePayload).filter((item): item is ClientePayload => item !== null)
+
+      if (mapped.length === 0) {
+        setImportError('Arquivo sem clientes validos. Use colunas como nome, email, telefone e cpf.')
+        return
+      }
+
+      setImportRows(mapped)
+      setImportProgress({
+        total: mapped.length,
+        processed: 0,
+        success: 0,
+        failed: 0,
+        currentName: '',
+      })
+    } catch {
+      setImportError('Nao foi possivel ler o arquivo. Verifique se o CSV esta valido.')
+    }
+  }
+
+  async function startImportClientes() {
+    if (!importRows.length || importRunning) return
+
+    setImportRunning(true)
+    setImportError('')
+
+    let success = 0
+    let failed = 0
+
+    for (let index = 0; index < importRows.length; index += 1) {
+      const row = importRows[index]
+      try {
+        setImportProgress({
+          total: importRows.length,
+          processed: index,
+          success,
+          failed,
+          currentName: row.nome,
+        })
+        await clienteService.create(row)
+        success += 1
+      } catch {
+        failed += 1
+      }
+
+      setImportProgress({
+        total: importRows.length,
+        processed: index + 1,
+        success,
+        failed,
+        currentName: row.nome,
+      })
+    }
+
+    setImportRunning(false)
+    await load()
+  }
+
+  function resetImportState() {
+    setImportRows([])
+    setImportFileName('')
+    setImportError('')
+    setImportProgress(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleDeleteAllClientes() {
+    if (bulkDeleting) return
+    setBulkDeleting(true)
+    setConviteMsg('')
+    try {
+      await clienteService.removeAll()
+      setShowBulkDeleteModal(false)
+      setBulkDeleteConfirmText('')
+      await load()
+      setConviteMsg('Todos os clientes foram excluidos com sucesso.')
+    } catch {
+      setConviteMsg('Nao foi possivel excluir todos os clientes. Tente novamente.')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   return (
     <AppLayout title="Clientes">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
           <div className="flex gap-2 flex-1 max-w-md">
             <input
               value={q}
@@ -384,10 +588,94 @@ export default function ClientesPage() {
               Buscar
             </button>
           </div>
-          <button onClick={openCreate} className="btn-primary">
-            + Novo Cliente
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={list.length === 0}
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-2.5 font-semibold shadow-sm hover:bg-red-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>Excluir todos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-gradient-to-r from-primary-50 to-white text-primary-700 px-4 py-2.5 font-semibold shadow-sm hover:shadow transition"
+            >
+              <span>Importar CSV</span>
+            </button>
+            <button onClick={openCreate} className="btn-primary">
+              + Novo Cliente
+            </button>
+          </div>
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={handleImportFile}
+          className="hidden"
+        />
+
+        {(importFileName || importError || importProgress) && (
+          <div className="card border border-primary-100 bg-gradient-to-br from-white via-primary-50/40 to-white">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Importacao de clientes</p>
+                <p className="text-xs text-gray-500">CSV com colunas: nome, email, telefone, cpf, cep, endereco</p>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary py-2 px-4">
+                  Trocar arquivo
+                </button>
+                <button type="button" onClick={resetImportState} className="btn-secondary py-2 px-4">
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {importFileName && (
+              <p className="mt-3 text-sm text-gray-700">
+                Arquivo: <span className="font-medium">{importFileName}</span>
+              </p>
+            )}
+
+            {importError && <div className="mt-3 bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{importError}</div>}
+
+            {importProgress && (
+              <div className="mt-4 space-y-3">
+                <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-700 transition-all duration-300"
+                    style={{ width: `${Math.min((importProgress.processed / importProgress.total) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                  <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Total:</span> <span className="font-semibold">{importProgress.total}</span></div>
+                  <div className="rounded-lg bg-blue-50 px-3 py-2"><span className="text-gray-500">Processados:</span> <span className="font-semibold">{importProgress.processed}</span></div>
+                  <div className="rounded-lg bg-green-50 px-3 py-2"><span className="text-gray-500">Sucesso:</span> <span className="font-semibold text-green-700">{importProgress.success}</span></div>
+                  <div className="rounded-lg bg-red-50 px-3 py-2"><span className="text-gray-500">Falhas:</span> <span className="font-semibold text-red-700">{importProgress.failed}</span></div>
+                </div>
+                <p className="text-xs text-gray-500 min-h-4">
+                  {importRunning
+                    ? `Importando: ${importProgress.currentName || 'iniciando...'}`
+                    : importProgress.processed > 0
+                      ? 'Importacao finalizada.'
+                      : `Pronto para importar ${importRows.length} cliente(s).`}
+                </p>
+                <button
+                  type="button"
+                  onClick={startImportClientes}
+                  disabled={importRunning || importRows.length === 0}
+                  className="btn-primary py-2 px-4"
+                >
+                  {importRunning ? 'Importando clientes...' : `Iniciar importacao (${importRows.length})`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {conviteMsg && (
           <div className="bg-primary-50 text-primary-900 text-sm px-4 py-3 rounded-lg border border-primary-200">
@@ -739,6 +1027,53 @@ export default function ClientesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Excluir todos os clientes</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Esta ação irá remover todos os clientes da empresa atual.
+              </p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Para confirmar, digite <span className="font-semibold">EXCLUIR</span> no campo abaixo.
+              </div>
+              <input
+                value={bulkDeleteConfirmText}
+                onChange={(e) => setBulkDeleteConfirmText(e.target.value)}
+                className="input-field"
+                placeholder="Digite EXCLUIR"
+                autoFocus
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (bulkDeleting) return
+                  setShowBulkDeleteModal(false)
+                  setBulkDeleteConfirmText('')
+                }}
+                className="btn-secondary flex-1"
+                disabled={bulkDeleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllClientes}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                disabled={bulkDeleting || bulkDeleteConfirmText.trim().toUpperCase() !== 'EXCLUIR'}
+              >
+                {bulkDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
+              </button>
+            </div>
           </div>
         </div>
       )}

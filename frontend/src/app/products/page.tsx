@@ -73,6 +73,7 @@ export default function ProductsPage() {
   const [importError, setImportError] = useState('')
   const [importRunning, setImportRunning] = useState(false)
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [importFinished, setImportFinished] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeBufferRef = useRef('')
@@ -313,6 +314,7 @@ export default function ProductsPage() {
     setImportError('')
     setImportProgress(null)
     setImportRows([])
+    setImportFinished(false)
     setImportFileName(file.name)
 
     try {
@@ -373,6 +375,8 @@ export default function ProductsPage() {
     }
 
     setImportRunning(false)
+    setImportFinished(true)
+    setImportRows([])
     await load()
   }
 
@@ -381,6 +385,7 @@ export default function ProductsPage() {
     setImportFileName('')
     setImportError('')
     setImportProgress(null)
+    setImportFinished(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -597,18 +602,20 @@ export default function ProductsPage() {
                 <p className="text-xs text-gray-500 min-h-4">
                   {importRunning
                     ? `Importando: ${importProgress.currentName || 'iniciando...'}`
-                    : importProgress.processed > 0
-                      ? 'Importacao finalizada.'
+                    : importFinished
+                      ? 'Importacao finalizada. Resumo acima — para nova leva, use Trocar arquivo ou Limpar.'
                       : `Pronto para importar ${importRows.length} produto(s).`}
                 </p>
-                <button
-                  type="button"
-                  onClick={startImportProducts}
-                  disabled={importRunning || importRows.length === 0}
-                  className="btn-primary py-2 px-4"
-                >
-                  {importRunning ? 'Importando produtos...' : `Iniciar importacao (${importRows.length})`}
-                </button>
+                {!importFinished && (
+                  <button
+                    type="button"
+                    onClick={startImportProducts}
+                    disabled={importRunning || importRows.length === 0}
+                    className="btn-primary py-2 px-4"
+                  >
+                    {importRunning ? 'Importando produtos...' : `Iniciar importacao (${importRows.length})`}
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -43,6 +43,14 @@ public class User {
     @Builder.Default
     private Boolean mustChangePassword = false;
 
+    /**
+     * true = cadastro via convite PDV sem senha no formulário; senha será definida só em /primeiro-acesso.
+     * false = senha provisória do admin ou senha já informada no cadastro.
+     */
+    @Column(name = "invite_self_registration", nullable = false)
+    @Builder.Default
+    private Boolean inviteSelfRegistration = false;
+
     /** Único terminal PDV em que o usuário pode operar (opcional). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pdv_terminal_id")

@@ -21,10 +21,29 @@ export type OrdemServicoPayload = {
   dataPrevisaoEntrega?: string | null
 }
 
+export type OsSugestaoCampo =
+  | 'nomeCliente'
+  | 'telefoneCliente'
+  | 'contatoCliente'
+  | 'equipamento'
+  | 'marca'
+  | 'modelo'
+  | 'numeroSerie'
+  | 'tecnicoResponsavel'
+  | 'acessorios'
+
 export const ordemServicoService = {
   async getAll(status?: StatusOrdemServico): Promise<OrdemServico[]> {
     const { data } = await api.get('/ordens-servico', { params: status ? { status } : undefined })
     return data
+  },
+
+  /** Valores distintos já usados em OS (histórico para combobox). */
+  async sugestoes(campo: OsSugestaoCampo, q: string): Promise<string[]> {
+    const { data } = await api.get<string[]>('/ordens-servico/sugestoes', {
+      params: { campo, q: q ?? '' },
+    })
+    return Array.isArray(data) ? data : []
   },
 
   async getById(id: number): Promise<OrdemServico> {

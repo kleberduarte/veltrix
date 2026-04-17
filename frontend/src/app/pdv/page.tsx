@@ -14,8 +14,9 @@ import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
 import { Cliente, CartItem, FormaPagamento, Order, PdvTerminal, Product } from '@/types'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { getAuth, isAuthenticated, removeAuth } from '@/lib/auth'
+import { getAuth, isAuthenticated } from '@/lib/auth'
 import { appAlert, appConfirm } from '@/lib/dialogs'
+import { authService } from '@/services/authService'
 import QRCode from 'qrcode'
 import { buildPixCopiaECola, isPixKeyPlaceholder } from '@/lib/pixCopiaECola'
 import { printThermalReceipt, type ThermalReceiptExtras } from '@/lib/printThermalReceipt'
@@ -36,6 +37,14 @@ function iconFormaPagamento(f: FormaPagamento) {
   if (f === 'DEBITO') return '🪪'
   if (f === 'PIX') return '📱'
   return '💳'
+}
+
+function resolveApiErrorMessage(err: unknown, fallback: string) {
+  const ax = err as { response?: { status?: number; data?: { error?: string } } }
+  if (ax.response?.status === 403) {
+    return ax.response.data?.error || 'Seu perfil nao possui permissao para esta operacao no PDV.'
+  }
+  return ax.response?.data?.error || fallback
 }
 
 /** Estados do caixa como no sistema-cadastro (bloqueia venda quando ≠ LIVRE) */
@@ -108,9 +117,10 @@ export default function PdvPage() {
   }, [])
 
   function sairDoPdv() {
-    if (isVendedor) {
-      removeAuth()
-      router.replace('/login')
+    const roleAtual = getAuth()?.role
+    if (roleAtual === 'VENDEDOR') {
+      const redirectPath = authService.logout()
+      router.replace(redirectPath)
       return
     }
     router.push('/dashboard')
@@ -186,7 +196,15 @@ export default function PdvPage() {
       router.push('/login')
       return
     }
-    loadBasics().finally(() => setLoading(false))
+    ;(async () => {
+      try {
+        await loadBasics()
+      } catch (err: unknown) {
+        await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel carregar os dados do PDV.'), 'Erro no PDV')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [router, loadBasics])
 
   useEffect(() => {
@@ -211,9 +229,13 @@ export default function PdvPage() {
   }, [terminais, authUser?.pdvTerminalId, terminalId])
 
   async function openUltimas() {
-    const all = await orderService.getAll()
-    setUltimas(all.slice(0, 15))
-    setShowUltimas(true)
+    try {
+      const all = await orderService.getAll()
+      setUltimas(all.slice(0, 15))
+      setShowUltimas(true)
+    } catch (err: unknown) {
+      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel carregar as ultimas vendas.'), 'Ultimas vendas')
+    }
   }
 
   async function buscarClientes() {
@@ -222,7 +244,11 @@ export default function PdvPage() {
       setClientesOpts([])
       return
     }
-    setClientesOpts(await clienteService.getAll(q))
+    try {
+      setClientesOpts(await clienteService.getAll(q))
+    } catch (err: unknown) {
+      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel buscar clientes.'), 'Clientes')
+    }
   }
 
   const subtotalCart = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
@@ -415,10 +441,15 @@ export default function PdvPage() {
     cpf: string
     endereco: string
   }) {
-    const c = await clienteService.create(payload)
-    setClienteId(c.id)
-    setClienteBusca(c.nome)
-    setClientesOpts([])
+    try {
+      const c = await clienteService.create(payload)
+      setClienteId(c.id)
+      setClienteBusca(c.nome)
+      setClientesOpts([])
+    } catch (err: unknown) {
+      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel cadastrar cliente no PDV.'), 'Clientes')
+      throw err
+    }
   }
 
   useEffect(() => {
@@ -452,6 +483,10 @@ export default function PdvPage() {
         }
         if (u.showUltimas) {
           setShowUltimas(false)
+          return
+        }
+        if (getAuth()?.role === 'VENDEDOR') {
+          sairDoPdv()
           return
         }
         if (await appConfirm('Deseja sair do PDV?', 'Sair do PDV')) sairDoPdv()
@@ -1037,7 +1072,7 @@ export default function PdvPage() {
                       >
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
                           <option key={n} value={n}>
-                            {n}x
+                            {n}x de {fmt(total / n)}
                           </option>
                         ))}
                       </select>

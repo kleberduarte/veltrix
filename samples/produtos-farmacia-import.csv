@@ -1,0 +1,21 @@
+nome;preco;estoque;codigoproduto;ean;categoria;descricao;estoqueminimo;tipocontrole;exigereceita;exigelote;exigevalidade;registroms;pmc
+Paracetamol 500mg 20 comp;8,90;120;PARA-500-20;7891000100101;Analgesicos;Analgesico e antitermico MIP;15;COMUM;nao;nao;nao;;
+Dipirona 500mg/ml Gotas 20ml;12,50;80;DIPI-GOT-20;7891000100102;Analgesicos;Solucao oral;10;COMUM;nao;nao;nao;;
+Ibuprofeno 600mg 10 comp;18,75;60;IBU-600-10;7891000100103;Anti-inflamatorios;Anti-inflamatorio nao hormonal;8;COMUM;nao;nao;nao;;
+Omeprazol 20mg 28 caps;32,90;45;OME-20-28;7891000100104;Digestivos;Inibidor da bomba de protons;6;COMUM;nao;nao;nao;;
+Losartana Potassica 50mg 30 comp;24,00;90;LOS-50-30;7891000100105;Anti-hipertensivos;Bloqueador do receptor de angiotensina;12;COMUM;nao;nao;nao;;
+Metformina 850mg 30 comp;15,40;100;MET-850-30;7891000100106;Antidiabeticos;Biguanida;15;COMUM;nao;nao;nao;;
+Amoxicilina 500mg 21 caps;45,90;35;AMOX-500-21;7891000100107;Antimicrobianos;Antibiotico beta-lactamico;5;ANTIMICROBIANO;sim;sim;sim;1.1234.5678.9012-3;52,00
+Azitromicina 500mg 3 comp;62,00;22;AZIT-500-3;7891000100108;Antimicrobianos;Macrolideo;4;ANTIMICROBIANO;sim;sim;sim;1.2345.6789.0123-4;71,50
+Ciprofloxacino 500mg 14 comp;38,00;28;CIPRO-500-14;7891000100109;Antimicrobianos;Quinolona sintetica;6;ANTIMICROBIANO;sim;sim;sim;1.3456.7890.1234-5;44,90
+Diazepam 10mg 20 comp;28,00;10;DIAZ-10-20;7891000100110;Controlados;Benzodiazepinico tarja preta;3;CONTROLADO;sim;sim;sim;1.4567.8901.2345-6;33,00
+Rivotril 2mg 20 comp;56,90;8;RIVOT-2-20;7891000100111;Controlados;Clonazepam lista B1;2;CONTROLADO;sim;sim;sim;1.5678.9012.3456-7;64,00
+Losartana + HCTZ 50/12,5mg 30 comp;38,50;55;LOS-HCTZ-30;7891000100112;Anti-hipertensivos;Associacao fixa;10;COMUM;nao;nao;nao;;
+Atorvastatina 20mg 30 comp;42,00;40;ATO-20-30;7891000100113;Hipolipemiantes;Inibidor da HMG-CoA redutase;8;COMUM;nao;nao;nao;;
+Salbutamol Spray 200 doses;22,00;50;SALB-SPR-200;7891000100114;Respiratorio;Broncodilatador beta-2;10;COMUM;nao;nao;nao;;
+Dexclorfeniramina + Betametasona Xarope 120ml;34,90;40;DEX-BETA-XAR;7891000100115;Anti-alergicos;Antialergico associado corticoide;8;COMUM;nao;nao;nao;;
+Vitamina D3 2000UI 30 caps;45,00;70;VITD3-2000;7891000100116;Vitaminas;Colecalciferol;12;COMUM;nao;nao;nao;;
+Agua Oxigenada 10 vol 200ml;6,90;200;AG-OXI-200;7891000100117;Higiene;Solucao antisseptica;30;COMUM;nao;nao;nao;;
+Alcool 70% 500ml;9,50;150;ALC-70-500;7891000100118;Higiene;Uso externo;40;COMUM;nao;nao;nao;;
+Loratadina 10mg 12 comp;16,00;85;LORA-10-12;7891000100119;Anti-alergicos;Anti-histaminico de segunda geracao;15;COMUM;nao;nao;nao;;
+Insulina NPH 100UI/ml 10ml;48,00;15;INS-NPH-10;7891000100120;Antidiabeticos;Insulina intermediaria refrigerar;4;COMUM;nao;sim;sim;1.6789.0123.4567-8;55,00

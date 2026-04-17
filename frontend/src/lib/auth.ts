@@ -3,9 +3,12 @@ export interface AuthUser {
   email: string
   companyId: number
   companyName: string
+  accessToken?: string | null
   token: string
   role?: string
   mustChangePassword?: boolean
+  /** Cadastro com código PDV sem senha no login — só define senha nesta tela (sem senha provisória). */
+  inviteSelfRegistration?: boolean
   pdvTerminalId?: number | null
   pdvTerminalCodigo?: string | null
 }
@@ -39,6 +42,14 @@ export function removeAuth() {
       /* ignore */
     }
   }
+}
+
+export function getLogoutRedirectPath(user?: AuthUser | null): string {
+  const current = user ?? getAuth()
+  const token = current?.accessToken?.trim()
+  const companyName = (current?.companyName ?? '').trim().toLowerCase()
+  const isDefaultCompany = companyName === 'default' || companyName === 'sistema'
+  return token && !isDefaultCompany ? `/acesso/${token}` : '/login'
 }
 
 export function isAuthenticated(): boolean {

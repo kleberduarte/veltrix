@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
+import { setDocumentFavicon } from '@/lib/empresaFavicon'
 import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
 
 const HEX = /^#[0-9A-Fa-f]{6}$/
@@ -112,17 +113,22 @@ export default function EmpresaTheme({ children }: { children: React.ReactNode }
 
   const carregar = useCallback(async () => {
     const root = document.documentElement
+    const onAcessoPage = pathname?.startsWith('/acesso')
+
     if (!isAuthenticated()) {
       aplicarCores(root, null)
+      if (!onAcessoPage) setDocumentFavicon(null)
       return
     }
     try {
       const p = await parametrosEmpresaService.get()
       aplicarCores(root, p)
+      if (!onAcessoPage) setDocumentFavicon(p?.logoUrl ?? null)
     } catch {
       aplicarCores(root, null)
+      if (!onAcessoPage) setDocumentFavicon(null)
     }
-  }, [])
+  }, [pathname])
 
   useEffect(() => {
     void carregar()

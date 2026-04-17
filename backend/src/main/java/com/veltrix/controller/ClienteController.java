@@ -46,6 +46,12 @@ public class ClienteController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping
+    public ResponseEntity<Void> deleteAll() {
+        clienteService.deleteAllFromCurrentCompany();
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/regenerar-convite")
     public ResponseEntity<Map<String, String>> regenerarConvite(@PathVariable Long id) {
         return ResponseEntity.ok(Map.of("codigo", clienteService.regenerarConvite(id)));

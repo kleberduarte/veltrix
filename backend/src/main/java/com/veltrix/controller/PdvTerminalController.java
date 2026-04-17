@@ -49,7 +49,9 @@ public class PdvTerminalController {
     public ResponseEntity<Void> heartbeat(@PathVariable Long id,
                                           @RequestBody(required = false) PdvHeartbeatRequest request,
                                           Authentication auth) {
-        service.heartbeat(id, auth.getName(), request != null ? request.getStatusCaixa() : null);
+        User u = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        service.heartbeat(id, u, auth.getName(), request != null ? request.getStatusCaixa() : null);
         return ResponseEntity.ok().build();
     }
 

@@ -5,7 +5,7 @@ import { reportService } from '@/services/reportService'
 import { orderService } from '@/services/orderService'
 import { DailyReport, Order } from '@/types'
 import { useRouter } from 'next/navigation'
-import { isAuthenticated } from '@/lib/auth'
+import { getAuth, isAuthenticated } from '@/lib/auth'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -28,6 +28,7 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
+    if (getAuth()?.role === 'VENDEDOR') { router.replace('/pdv'); return }
     let cancelled = false
     ;(async () => {
       setLoading(true)
@@ -43,6 +44,7 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) return
+    if (getAuth()?.role === 'VENDEDOR') return
     let cancelled = false
     ;(async () => {
       setLoadingPeriod(true)

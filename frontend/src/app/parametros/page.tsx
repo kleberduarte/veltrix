@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { parametrosEmpresaService, ParametroEmpresaPayload } from '@/services/parametrosEmpresaService'
 import { CompanyOption, ParametroEmpresa, Segmento } from '@/types'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
+import { appConfirm } from '@/lib/dialogs'
 import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import {
@@ -178,13 +179,16 @@ export default function ParametrosPage() {
   const [switching, setSwitching] = useState(false)
   const [creatingCo, setCreatingCo] = useState(false)
   const [empresaErr, setEmpresaErr] = useState('')
+  /** Código PDV exibido após criar empresa (copiável). */
+  const [empresaPdvCodeHighlight, setEmpresaPdvCodeHighlight] = useState<string | null>(null)
   const [isAdm, setIsAdm] = useState(false)
   const [deleteCompanyId, setDeleteCompanyId] = useState<number | null>(null)
   const [deleteCompanyName, setDeleteCompanyName] = useState('')
   const [deletingCompany, setDeletingCompany] = useState(false)
-  const [onboardingCopied, setOnboardingCopied] = useState<number | null>(null)
   const [accessCopied, setAccessCopied] = useState<number | null>(null)
-  const [onboardingRegen, setOnboardingRegen] = useState<number | null>(null)
+  const [reloading, setReloading] = useState(false)
+  const [companySearch, setCompanySearch] = useState('')
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState('')
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -201,20 +205,13 @@ export default function ParametrosPage() {
         const defaultCo = list.find(isReservedCompany) ?? null
         const currentId = getAuth()?.companyId ?? null
 
-        // Pré-seleciona "Default" (Restaurante Teste) ao montar a tela
-        if (defaultCo && currentId !== defaultCo.id) {
-          try {
-            await authService.switchCompany(defaultCo.id)
-          } catch {
-            // falha silenciosa; mantém empresa atual
-          }
-          setCurrentCompanyId(defaultCo.id)
-        } else {
-          setCurrentCompanyId(defaultCo?.id ?? currentId)
-        }
+        // Mantém a empresa do JWT (admin de tenant único não deve ser trocado para "default").
+        setCurrentCompanyId(currentId ?? defaultCo?.id ?? null)
 
         const p = await parametrosEmpresaService.get()
-        setForm(formFromParametros(p))
+        const next = formFromParametros(p)
+        setForm(next)
+        setInitialFormSnapshot(JSON.stringify(next))
       } finally {
         setLoading(false)
       }
@@ -223,11 +220,41 @@ export default function ParametrosPage() {
 
   async function refreshParametrosFromApi() {
     const p = await parametrosEmpresaService.get()
-    setForm(formFromParametros(p))
+    const next = formFromParametros(p)
+    setForm(next)
+    setInitialFormSnapshot(JSON.stringify(next))
+  }
+
+  async function reloadCurrentCompanyParams() {
+    if (hasUnsavedChanges) {
+      const ok = await appConfirm(
+        'Existem alteracoes nao salvas. Deseja descartar e recarregar os parametros?',
+        'Descartar alteracoes',
+      )
+      if (!ok) return
+    }
+    setReloading(true)
+    setError('')
+    setFieldErrors({})
+    setSuccess(false)
+    try {
+      await refreshParametrosFromApi()
+    } catch {
+      setError('Nao foi possivel recarregar os parametros desta empresa.')
+    } finally {
+      setReloading(false)
+    }
   }
 
   async function handleSwitchCompany(companyId: number) {
     if (currentCompanyId === companyId) return
+    if (hasUnsavedChanges) {
+      const ok = await appConfirm(
+        'Existem alteracoes nao salvas. Deseja trocar de empresa e descartar essas alteracoes?',
+        'Trocar empresa',
+      )
+      if (!ok) return
+    }
     setSwitching(true)
     setEmpresaErr('')
     try {
@@ -250,6 +277,7 @@ export default function ParametrosPage() {
     }
     setCreatingCo(true)
     setEmpresaErr('')
+    setEmpresaPdvCodeHighlight(null)
     try {
       const c = await authService.createCompany(n)
       setNewCompanyName('')
@@ -257,6 +285,7 @@ export default function ParametrosPage() {
       await authService.switchCompany(c.id)
       setCurrentCompanyId(c.id)
       await refreshParametrosFromApi()
+      if (c.pdvInviteCode) setEmpresaPdvCodeHighlight(c.pdvInviteCode)
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } }
       setEmpresaErr(ax.response?.data?.error || 'Não foi possível criar a empresa.')
@@ -292,11 +321,6 @@ export default function ParametrosPage() {
     }
   }
 
-  function buildOnboardingLink(token: string) {
-    if (typeof window === 'undefined') return ''
-    return `${window.location.origin}/onboarding/${token}`
-  }
-
   function buildAccessLink(token: string) {
     if (typeof window === 'undefined') return ''
     return `${window.location.origin}/acesso/${token}`
@@ -310,32 +334,6 @@ export default function ParametrosPage() {
       window.setTimeout(() => setAccessCopied(null), 2000)
     } catch {
       setEmpresaErr('Não foi possível copiar automaticamente.')
-    }
-  }
-
-  async function copyOnboardingLink(company: CompanyOption) {
-    if (!company.onboardingToken) return
-    try {
-      await navigator.clipboard.writeText(buildOnboardingLink(company.onboardingToken))
-      setOnboardingCopied(company.id)
-      window.setTimeout(() => setOnboardingCopied(null), 2000)
-    } catch {
-      setEmpresaErr('Não foi possível copiar automaticamente.')
-    }
-  }
-
-  async function regenOnboardingToken(companyId: number) {
-    setOnboardingRegen(companyId)
-    setEmpresaErr('')
-    try {
-      const updated = await authService.regenerateOnboarding(companyId)
-      setCompanies(prev =>
-        prev.map(c => c.id === companyId ? { ...c, onboardingToken: updated.onboardingToken ?? null } : c)
-      )
-    } catch {
-      setEmpresaErr('Não foi possível regenerar o link.')
-    } finally {
-      setOnboardingRegen(null)
     }
   }
 
@@ -405,7 +403,9 @@ export default function ParametrosPage() {
       setSuccess(true)
       window.setTimeout(() => setSuccess(false), 5000)
       if (saved) {
-        setForm(formFromParametros(saved))
+        const next = formFromParametros(saved)
+        setForm(next)
+        setInitialFormSnapshot(JSON.stringify(next))
         window.dispatchEvent(new Event('veltrix-auth-changed'))
       }
     } catch (err: unknown) {
@@ -422,8 +422,61 @@ export default function ParametrosPage() {
     setForm(f => ({ ...f, [field]: v.slice(0, 7) }))
   }
 
+  function scrollToSection(id: string) {
+    if (typeof window === 'undefined') return
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const farmaciaOff = !form.moduloFarmaciaAtivo
   const pmcOff = farmaciaOff || !form.farmaciaPmcAtivo
+  const segmentoAtual = form.segmento ?? 'GERAL'
+  const showFarmaciaModule = segmentoAtual !== 'INFORMATICA'
+  const showInformaticaModule = segmentoAtual !== 'FARMACIA'
+  const activeCompany = companies.find(c => c.id === currentCompanyId) ?? null
+  /** ADM global: sempre vê lista, busca e troca de empresas, independente da empresa ativa no JWT. */
+  const showEmpresasManagement = isAdm
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(form) !== initialFormSnapshot,
+    [form, initialFormSnapshot],
+  )
+  const orderedCompanies = useMemo(() => {
+    const defaultCo = companies.find(isReservedCompany) ?? null
+    return defaultCo ? [defaultCo, ...companies.filter(c => c.id !== defaultCo.id)] : companies
+  }, [companies])
+  const filteredCompanies = useMemo(() => {
+    const q = companySearch.trim().toLowerCase()
+    if (!q) return orderedCompanies
+    return orderedCompanies.filter((c) => (c.name ?? '').toLowerCase().includes(q))
+  }, [orderedCompanies, companySearch])
+  const sectionLinks = useMemo(() => {
+    const base: { id: string; label: string }[] = []
+    if (showEmpresasManagement) base.push({ id: 'sec-empresas', label: 'Empresas' })
+    base.push(
+      { id: 'sec-identidade', label: 'Identidade' },
+      { id: 'sec-tema', label: 'Aparencia' },
+      { id: 'sec-comercial', label: 'Comercial' },
+      { id: 'sec-segmento', label: 'Segmento' },
+    )
+    if (showFarmaciaModule) base.push({ id: 'sec-farmacia', label: 'Farmacia' })
+    if (showInformaticaModule) base.push({ id: 'sec-informatica', label: 'Informatica / OS' })
+    return base
+  }, [showEmpresasManagement, showFarmaciaModule, showInformaticaModule])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        if (!saving && !reloading) {
+          const formEl = document.getElementById('parametros-form') as HTMLFormElement | null
+          formEl?.requestSubmit()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [reloading, saving])
 
   if (loading) {
     return (
@@ -436,18 +489,59 @@ export default function ParametrosPage() {
   return (
     <AppLayout title="Parâmetros da empresa">
       <div className="max-w-4xl mx-auto pb-24">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Parâmetros da empresa</h1>
-          <p className="text-gray-600 mt-1 max-w-2xl">
-            Identidade visual, PIX, segmento e módulos (farmácia / informática), com as mesmas regras de validação do
-            cadastro legado: tamanhos, cores #RRGGBB, e-mail, telefone BR, CNPJ e modo PMC.
-          </p>
+        <header className="mb-6 space-y-4">
+          <div className="rounded-2xl border border-primary-100 bg-gradient-to-br from-white via-primary-50/40 to-white p-5 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Parâmetros da empresa</h1>
+                <p className="text-gray-600 mt-1 max-w-2xl">
+                  Configure identidade visual, suporte, segmento e modulos em um unico painel, com validacoes automaticas.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <p className="text-gray-500">Empresa ativa</p>
+                  <p className="font-semibold text-gray-800 truncate">{activeCompany?.name ?? 'Nao selecionada'}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <p className="text-gray-500">Segmento</p>
+                  <p className="font-semibold text-gray-800">{segLabel(form.segmento ?? 'GERAL')}</p>
+                </div>
+                {form.moduloFarmaciaAtivo && (
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <p className="text-gray-500">Farmacia</p>
+                    <p className="font-semibold text-emerald-700">Ativo</p>
+                  </div>
+                )}
+                {form.moduloInformaticaAtivo && (
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <p className="text-gray-500">Informatica / OS</p>
+                    <p className="font-semibold text-emerald-700">Ativo</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {sectionLinks.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollToSection(item.id)}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-primary-200 hover:bg-primary-50 transition"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </header>
 
-        <form onSubmit={handleSave} className="space-y-6">
+        <form id="parametros-form" onSubmit={handleSave} className="space-y-6">
 
-          {/* ── Empresas ── */}
-          <section className="rounded-2xl border border-gray-200/90 bg-white p-6 shadow-sm ring-1 ring-black/[0.03]">
+          {/* ── Empresas (somente ADM na empresa default / sistema) ── */}
+          {showEmpresasManagement && (
+          <section id="sec-empresas" className="rounded-2xl border border-gray-200/90 bg-white p-6 shadow-sm ring-1 ring-black/[0.03]">
             {/* Cabeçalho + form inline de nova empresa */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
               <div className="flex-1 min-w-0">
@@ -479,25 +573,48 @@ export default function ParametrosPage() {
             </div>
 
             {empresaErr && <p className="text-sm text-red-600 mb-3">{empresaErr}</p>}
+            {empresaPdvCodeHighlight && (
+              <div className="mb-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Convite PDV (vendedor no login)</p>
+                  <p className="mt-1 text-sm text-emerald-900">
+                    Empresa criada. Informe este código em <strong>Primeiro acesso</strong> na tela de login.
+                  </p>
+                  <code className="mt-2 inline-block rounded-lg bg-white px-3 py-2 font-mono text-base font-semibold text-emerald-950 ring-1 ring-emerald-200">
+                    {empresaPdvCodeHighlight}
+                  </code>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 self-start rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 sm:self-center"
+                  onClick={() => void navigator.clipboard.writeText(empresaPdvCodeHighlight)}
+                >
+                  Copiar código
+                </button>
+              </div>
+            )}
+
+            <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+              <input
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                className="input-field max-w-sm"
+                placeholder="Buscar empresa..."
+              />
+              <p className="text-xs text-gray-500">
+                {filteredCompanies.length} de {orderedCompanies.length} empresa(s)
+              </p>
+            </div>
 
             {/* Lista unificada */}
-            {(() => {
-              const defaultCo = companies.find(isReservedCompany) ?? null
-              const ordered = defaultCo
-                ? [defaultCo, ...companies.filter(c => c.id !== defaultCo.id)]
-                : companies
-
-              if (ordered.length === 0) {
-                return <p className="text-sm text-gray-400 italic">Nenhuma empresa encontrada.</p>
-              }
-
-              return (
-                <div className="max-h-[520px] overflow-y-auto pr-1">
-                  <ul className="space-y-2">
-                    {ordered.map(c => {
+            {filteredCompanies.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">Nenhuma empresa encontrada para esta busca.</p>
+            ) : (
+              <div className="max-h-[520px] overflow-y-auto pr-1">
+                <ul className="space-y-2">
+                  {filteredCompanies.map(c => {
                     const isActive = c.id === currentCompanyId
                     const isDefaultCo = isReservedCompany(c)
-                    const hasOnboarding = !!c.onboardingToken
                     return (
                       <li
                         key={c.id}
@@ -539,7 +656,8 @@ export default function ParametrosPage() {
                           </button>
 
                           {/* Badges + ações */}
-                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                             {isDefaultCo && (
                               <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500 ring-1 ring-gray-200">
                                 Default
@@ -550,55 +668,19 @@ export default function ParametrosPage() {
                                 Ativa
                               </span>
                             )}
+                            </div>
 
-                            {/* Ações de onboarding + excluir (ADM, não-Default) */}
+                            {/* Excluir (ADM, não-Default) */}
                             {isAdm && !isDefaultCo && (
-                              <>
-                                {c.accessToken && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void copyAccessLink(c)}
-                                    className={[
-                                      'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
-                                      accessCopied === c.id
-                                        ? 'border-green-200 bg-green-50 text-green-700'
-                                        : 'border-primary-200 bg-white text-primary-700 hover:bg-primary-50',
-                                    ].join(' ')}
-                                  >
-                                    {accessCopied === c.id ? 'Acesso copiado!' : 'Copiar acesso'}
-                                  </button>
-                                )}
-                                {hasOnboarding && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void copyOnboardingLink(c)}
-                                    className={[
-                                      'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
-                                      onboardingCopied === c.id
-                                        ? 'border-green-200 bg-green-50 text-green-700'
-                                        : 'border-primary-200 bg-white text-primary-700 hover:bg-primary-50',
-                                    ].join(' ')}
-                                  >
-                                    {onboardingCopied === c.id ? 'Copiado!' : 'Copiar link'}
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={onboardingRegen === c.id}
-                                  onClick={() => void regenOnboardingToken(c.id)}
-                                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                  title="Gerar novo link (invalida o anterior)"
-                                >
-                                  {onboardingRegen === c.id ? '…' : 'Novo link'}
-                                </button>
+                              <div className="flex items-center gap-2 flex-wrap justify-end">
                                 <button
                                   type="button"
                                   onClick={() => { setDeleteCompanyId(c.id); setDeleteCompanyName(c.name) }}
-                                  className="rounded-lg border border-transparent px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                  className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
                                 >
                                   Excluir
                                 </button>
-                              </>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -606,35 +688,41 @@ export default function ParametrosPage() {
                         {/* Links em layout mais legível */}
                         {isAdm && !isDefaultCo && (
                           <div className="px-4 pb-4">
-                            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+                            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-3">
                               {c.accessToken && (
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Link de acesso da empresa</p>
+                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Link de acesso da empresa</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => void copyAccessLink(c)}
+                                      className={[
+                                        'rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                                        accessCopied === c.id
+                                          ? 'border-green-200 bg-green-50 text-green-700'
+                                          : 'border-primary-200 bg-white text-primary-700 hover:bg-primary-50',
+                                      ].join(' ')}
+                                    >
+                                      {accessCopied === c.id ? 'Copiado' : 'Copiar'}
+                                    </button>
+                                  </div>
                                   <p className="text-xs text-gray-700 font-mono break-all">{buildAccessLink(c.accessToken)}</p>
+                                  <p className="text-xs text-gray-500 mt-2">
+                                    Login, primeiro acesso e convite PDV usam este endereço. Administradores e vendedores são criados pelo painel ou pelo código de convite.
+                                  </p>
                                 </div>
                               )}
-
-                              <div className="pt-1 border-t border-gray-200/80">
-                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Link de onboarding (primeiro acesso)</p>
-                                {hasOnboarding ? (
-                                  <p className="text-xs text-gray-600 font-mono break-all">{buildOnboardingLink(c.onboardingToken as string)}</p>
-                                ) : (
-                                  <p className="text-xs text-amber-600">
-                                    Já utilizado. Gere em <strong>Novo link</strong> para criar outro.
-                                  </p>
-                                )}
-                              </div>
                             </div>
                           </div>
                         )}
                       </li>
                     )
                   })}
-                  </ul>
-                </div>
-              )
-            })()}
+                </ul>
+              </div>
+            )}
           </section>
+          )}
 
           {success && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 px-4 py-3 text-sm">
@@ -643,6 +731,7 @@ export default function ParametrosPage() {
           )}
 
           <Section
+            id="sec-identidade"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -712,6 +801,7 @@ export default function ParametrosPage() {
           </Section>
 
           <Section
+            id="sec-tema"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -759,6 +849,7 @@ export default function ParametrosPage() {
           </Section>
 
           <Section
+            id="sec-comercial"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -812,6 +903,7 @@ export default function ParametrosPage() {
           </Section>
 
           <Section
+            id="sec-segmento"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -846,7 +938,9 @@ export default function ParametrosPage() {
             </div>
           </Section>
 
+          {showFarmaciaModule && (
           <Section
+            id="sec-farmacia"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -907,8 +1001,11 @@ export default function ParametrosPage() {
               </div>
             </div>
           </Section>
+          )}
 
+          {showInformaticaModule && (
           <Section
+            id="sec-informatica"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path
@@ -1038,15 +1135,34 @@ export default function ParametrosPage() {
               </div>
             </div>
           </Section>
+          )}
 
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm px-4 py-3">{error}</div>
           )}
 
           <div className="sticky bottom-0 left-0 right-0 pt-4 pb-2 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent -mx-4 px-4 sm:mx-0 sm:px-0">
-            <button type="submit" disabled={saving} className="btn-primary w-full sm:w-auto min-w-[200px]">
-              {saving ? 'Salvando...' : 'Salvar parâmetros'}
-            </button>
+            <div className="rounded-2xl border border-gray-200 bg-white/95 backdrop-blur px-4 py-3 shadow-sm flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+              <div className="text-xs">
+                <p className="text-gray-500">Dica: use os atalhos acima para navegar rapido entre as secoes.</p>
+                <p className={`${hasUnsavedChanges ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {hasUnsavedChanges ? 'Existem alteracoes pendentes.' : 'Sem alteracoes pendentes.'}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void reloadCurrentCompanyParams()}
+                  disabled={saving || reloading}
+                  className="btn-secondary"
+                >
+                  {reloading ? 'Recarregando...' : 'Recarregar'}
+                </button>
+                <button type="submit" disabled={saving || reloading} className="btn-primary min-w-[200px]">
+                  {saving ? 'Salvando...' : hasUnsavedChanges ? 'Salvar parametros' : 'Salvar (sem alteracoes)'}
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

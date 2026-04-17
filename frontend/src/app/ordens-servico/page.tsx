@@ -1,8 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import AppLayout from '@/components/layout/AppLayout'
+import OsComboboxField from '@/components/ordem-servico/OsComboboxField'
+import OrdemServicoPrintDocument from '@/components/ordem-servico/OrdemServicoPrintDocument'
 import { ordemServicoService, OrdemServicoPayload } from '@/services/ordemServicoService'
-import { OrdemServico, StatusOrdemServico } from '@/types'
+import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
+import { OrdemServico, ParametroEmpresa, StatusOrdemServico } from '@/types'
 import { useRouter } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
 import { appAlert, appConfirm } from '@/lib/dialogs'
@@ -78,11 +82,28 @@ export default function OrdensServicoPage() {
   const [editing, setEditing] = useState<OrdemServico | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [parametro, setParametro] = useState<ParametroEmpresa | null>(null)
+  const [printOs, setPrintOs] = useState<OrdemServico | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
     load()
   }, [router, filterStatus])
+
+  useEffect(() => {
+    parametrosEmpresaService.get().then(setParametro).catch(() => setParametro(null))
+  }, [])
+
+  useEffect(() => {
+    if (!printOs) return
+    const timer = window.setTimeout(() => window.print(), 200)
+    const onAfterPrint = () => setPrintOs(null)
+    window.addEventListener('afterprint', onAfterPrint)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('afterprint', onAfterPrint)
+    }
+  }, [printOs])
 
   async function load() {
     setLoading(true)
@@ -202,7 +223,14 @@ export default function OrdensServicoPage() {
                       {new Date(os.dataAbertura).toLocaleString('pt-BR')}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPrintOs(os)}
+                          className="text-slate-600 hover:text-slate-900 text-sm font-medium"
+                        >
+                          Imprimir
+                        </button>
                         <button type="button" onClick={() => openEdit(os)} className="text-primary-600 hover:text-primary-800 text-sm font-medium">Editar</button>
                         <button type="button" onClick={() => handleDelete(os)} className="text-red-500 hover:text-red-700 text-sm font-medium">Excluir</button>
                       </div>
@@ -215,6 +243,15 @@ export default function OrdensServicoPage() {
         )}
       </div>
 
+      {printOs &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="os-print-layer" aria-hidden>
+            <OrdemServicoPrintDocument os={printOs} empresa={parametro} />
+          </div>,
+          document.body,
+        )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8">
@@ -225,17 +262,26 @@ export default function OrdensServicoPage() {
             <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome do cliente *</label>
-                  <input value={form.nomeCliente} onChange={e => setForm({ ...form, nomeCliente: e.target.value })} required className="input-field" />
+                  <OsComboboxField
+                    label="Nome do cliente *"
+                    campo="nomeCliente"
+                    value={form.nomeCliente}
+                    onChange={v => setForm({ ...form, nomeCliente: v })}
+                    required
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                  <input value={form.telefoneCliente ?? ''} onChange={e => setForm({ ...form, telefoneCliente: e.target.value })} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contato</label>
-                  <input value={form.contatoCliente ?? ''} onChange={e => setForm({ ...form, contatoCliente: e.target.value })} className="input-field" />
-                </div>
+                <OsComboboxField
+                  label="Telefone"
+                  campo="telefoneCliente"
+                  value={form.telefoneCliente ?? ''}
+                  onChange={v => setForm({ ...form, telefoneCliente: v })}
+                />
+                <OsComboboxField
+                  label="Contato"
+                  campo="contatoCliente"
+                  value={form.contatoCliente ?? ''}
+                  onChange={v => setForm({ ...form, contatoCliente: v })}
+                />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ID cliente (opcional)</label>
                   <input type="number" min={1} value={form.clienteId ?? ''} onChange={e => setForm({ ...form, clienteId: e.target.value ? Number(e.target.value) : undefined })} className="input-field" />
@@ -246,25 +292,39 @@ export default function OrdensServicoPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipamento</label>
-                  <input value={form.equipamento ?? ''} onChange={e => setForm({ ...form, equipamento: e.target.value })} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-                  <input value={form.marca ?? ''} onChange={e => setForm({ ...form, marca: e.target.value })} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
-                  <input value={form.modelo ?? ''} onChange={e => setForm({ ...form, modelo: e.target.value })} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nº série</label>
-                  <input value={form.numeroSerie ?? ''} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Acessórios</label>
-                  <input value={form.acessorios ?? ''} onChange={e => setForm({ ...form, acessorios: e.target.value })} className="input-field" />
+                <OsComboboxField
+                  label="Equipamento"
+                  campo="equipamento"
+                  value={form.equipamento ?? ''}
+                  onChange={v => setForm({ ...form, equipamento: v })}
+                />
+                <OsComboboxField
+                  label="Marca"
+                  campo="marca"
+                  value={form.marca ?? ''}
+                  onChange={v => setForm({ ...form, marca: v })}
+                />
+                <OsComboboxField
+                  label="Modelo"
+                  campo="modelo"
+                  value={form.modelo ?? ''}
+                  onChange={v => setForm({ ...form, modelo: v })}
+                />
+                <OsComboboxField
+                  label="Nº série"
+                  campo="numeroSerie"
+                  value={form.numeroSerie ?? ''}
+                  onChange={v => setForm({ ...form, numeroSerie: v })}
+                />
+                <div className="sm:col-span-2">
+                  <OsComboboxField
+                    label="Acessórios"
+                    campo="acessorios"
+                    value={form.acessorios ?? ''}
+                    onChange={v => setForm({ ...form, acessorios: v })}
+                    multiline
+                    rows={2}
+                  />
                 </div>
               </div>
               <div>
@@ -280,10 +340,12 @@ export default function OrdensServicoPage() {
                 <textarea value={form.servicoExecutado ?? ''} onChange={e => setForm({ ...form, servicoExecutado: e.target.value })} className="input-field min-h-[72px]" rows={2} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
-                  <input value={form.tecnicoResponsavel ?? ''} onChange={e => setForm({ ...form, tecnicoResponsavel: e.target.value })} className="input-field" />
-                </div>
+                <OsComboboxField
+                  label="Técnico"
+                  campo="tecnicoResponsavel"
+                  value={form.tecnicoResponsavel ?? ''}
+                  onChange={v => setForm({ ...form, tecnicoResponsavel: v })}
+                />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
                   <input value={form.observacao ?? ''} onChange={e => setForm({ ...form, observacao: e.target.value })} className="input-field" />
@@ -298,9 +360,22 @@ export default function OrdensServicoPage() {
                 </div>
               </div>
               {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{error}</div>}
-              <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancelar</button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Salvando...' : 'Salvar'}</button>
+              <div className="flex flex-wrap gap-3 pt-2 sticky bottom-0 bg-white pb-1">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1 min-w-[120px]">Cancelar</button>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const os = editing
+                      setShowModal(false)
+                      setPrintOs(os)
+                    }}
+                    className="btn-secondary flex-1 min-w-[120px]"
+                  >
+                    Imprimir
+                  </button>
+                )}
+                <button type="submit" disabled={saving} className="btn-primary flex-1 min-w-[120px]">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
           </div>

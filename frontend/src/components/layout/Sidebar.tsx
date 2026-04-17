@@ -159,8 +159,8 @@ export default function Sidebar() {
   }, [])
 
   function handleLogout() {
-    authService.logout()
-    router.push('/login')
+    const redirectPath = authService.logout()
+    router.push(redirectPath)
   }
 
   return (

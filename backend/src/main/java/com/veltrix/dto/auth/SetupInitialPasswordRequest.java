@@ -6,17 +6,15 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class RegisterAdminRequest {
-    @NotBlank
-    private String name;
-
+public class SetupInitialPasswordRequest {
     @NotBlank
     @Email
     private String email;
 
     @NotBlank
-    @Size(min = 4)
-    private String password;
+    private String senhaProvisoria;
 
-    private String telefone;
+    @NotBlank
+    @Size(min = 6)
+    private String novaSenha;
 }

@@ -64,9 +64,17 @@ public class PdvTerminalService {
     }
 
     @Transactional
-    public void heartbeat(Long id, String operador, StatusCaixa statusCaixa) {
+    public void heartbeat(Long id, User currentUser, String operador, StatusCaixa statusCaixa) {
         PdvTerminal t = repository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("Terminal não encontrado"));
+        // Vínculo do usuário com terminal só acontece no uso real do PDV (heartbeat).
+        boolean mesmoContextoEmpresa = currentUser.getCompany() != null
+                && currentUser.getCompany().getId().equals(TenantContext.getCompanyId());
+        if (mesmoContextoEmpresa && (currentUser.getPdvTerminal() == null
+                || !currentUser.getPdvTerminal().getId().equals(t.getId()))) {
+            currentUser.setPdvTerminal(t);
+            userRepository.save(currentUser);
+        }
         t.setUltimoHeartbeat(LocalDateTime.now());
         t.setUltimoOperador(operador);
         if (statusCaixa != null) {

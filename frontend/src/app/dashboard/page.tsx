@@ -4,7 +4,7 @@ import AppLayout from '@/components/layout/AppLayout'
 import { reportService } from '@/services/reportService'
 import { DailyReport } from '@/types'
 import { useRouter } from 'next/navigation'
-import { isAuthenticated } from '@/lib/auth'
+import { getAuth, isAuthenticated } from '@/lib/auth'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -17,6 +17,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
+    if (getAuth()?.role === 'VENDEDOR') { router.replace('/pdv'); return }
     reportService.getDaily().then(setReport).finally(() => setLoading(false))
   }, [router])
 
