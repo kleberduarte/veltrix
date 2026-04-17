@@ -248,7 +248,9 @@ export default function LoginRegisterExperience({
           <div className="relative w-full max-w-[440px]">
             <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/95 shadow-2xl shadow-slate-900/20 ring-1 ring-slate-900/5 backdrop-blur-xl">
               <div
-                className="relative px-6 py-8 text-center text-white"
+                className={`relative px-6 py-8 text-center text-white ${
+                  isCompany ? '' : 'bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800'
+                }`}
                 style={
                   isCompany
                     ? { background: `linear-gradient(135deg, ${secondary} 0%, ${primary} 100%)` }
