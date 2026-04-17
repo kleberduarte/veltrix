@@ -40,6 +40,7 @@ export default function LoginRegisterExperience({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [registerPromptOpen, setRegisterPromptOpen] = useState(false)
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -223,7 +224,11 @@ export default function LoginRegisterExperience({
   }
 
   const fieldClassName =
-    'w-full rounded-xl border border-slate-200/90 bg-slate-50/60 px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] placeholder:text-slate-400 transition-all duration-200 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/12'
+    'w-full h-14 rounded-[14px] border border-slate-300/70 bg-slate-50/80 px-4 text-base text-slate-700 placeholder:text-slate-400 transition-all duration-150 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0'
+  const fieldWithIconClassName = `${fieldClassName} pl-12`
+  const fieldWithIconAndActionClassName = `${fieldWithIconClassName} pr-12`
+  const floatingLabelClassName =
+    'pointer-events-none absolute left-3 -top-[7px] z-10 bg-slate-50 px-1 text-xs font-normal leading-none text-slate-500'
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-slate-100/95 via-gray-50 to-slate-200/40">
@@ -497,64 +502,104 @@ export default function LoginRegisterExperience({
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === 'firstAccess' && (
                 <>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Seu nome</label>
-                    <input
-                      name="name"
-                      value={form.name}
-                      onChange={onChange}
-                      required
-                      className={fieldClassName}
-                      placeholder="Seu nome completo"
-                    />
+                  <div className="relative">
+                    <label className={floatingLabelClassName}>Seu nome</label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                        <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 19.5a7.5 7.5 0 0 1 15 0" />
+                        </svg>
+                      </span>
+                      <input
+                        name="name"
+                        value={form.name}
+                        onChange={onChange}
+                        required
+                        className={fieldWithIconClassName}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <div className="relative">
+                    <label className={floatingLabelClassName}>
                       Código de convite (PDV)
                     </label>
-                    <input
-                      name="codigoConvite"
-                      value={form.codigoConvite}
-                      onChange={onChange}
-                      required
-                      className={fieldClassName}
-                      placeholder="Código de convite (PDV)"
-                      autoComplete="off"
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                        <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V7.875a4.125 4.125 0 1 0-8.25 0V10.5M6.75 10.5h10.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H6.75a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5Z" />
+                        </svg>
+                      </span>
+                      <input
+                        name="codigoConvite"
+                        value={form.codigoConvite}
+                        onChange={onChange}
+                        required
+                        className={fieldWithIconClassName}
+                        autoComplete="off"
+                      />
+                    </div>
                   </div>
                 </>
               )}
 
               {(mode === 'firstAccess' || mode === 'login') && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">E-mail</label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={onChange}
-                    required
-                    className={fieldClassName}
-                    placeholder="email@empresa.com"
-                    autoComplete="email"
-                  />
+                <div className="relative">
+                  <label className={floatingLabelClassName}>Email</label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                      <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 7.5v9A2.25 2.25 0 0 1 19.5 18.75h-15A2.25 2.25 0 0 1 2.25 16.5v-9m19.5 0A2.25 2.25 0 0 0 19.5 5.25h-15A2.25 2.25 0 0 0 2.25 7.5m19.5 0-9.06 6.04a1.25 1.25 0 0 1-1.38 0L2.25 7.5" />
+                      </svg>
+                    </span>
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={onChange}
+                      required
+                      className={fieldWithIconClassName}
+                      autoComplete="email"
+                    />
+                  </div>
                 </div>
               )}
 
               {mode === 'login' && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Senha</label>
-                  <input
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={onChange}
-                    required
-                    minLength={4}
-                    className={fieldClassName}
-                    placeholder="Digite sua senha de acesso"
-                    autoComplete="current-password"
-                  />
+                <div className="relative">
+                  <label className={floatingLabelClassName}>Senha</label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                      <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V7.875a4.125 4.125 0 1 0-8.25 0V10.5M6.75 10.5h10.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H6.75a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5Z" />
+                      </svg>
+                    </span>
+                    <input
+                      name="password"
+                      type={showLoginPassword ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={onChange}
+                      required
+                      className={fieldWithIconAndActionClassName}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(v => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 transition-colors hover:text-slate-600"
+                      aria-label={showLoginPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showLoginPassword ? (
+                        <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.584 10.587A2 2 0 0 0 13.413 13.4M9.88 5.09A10.94 10.94 0 0 1 12 4.875c4.804 0 8.775 3.379 9.692 7.875a10.467 10.467 0 0 1-2.116 4.236M6.229 6.228A10.45 10.45 0 0 0 2.308 12.75c.462 2.265 1.624 4.282 3.242 5.79A10.92 10.92 0 0 0 12 20.625c1.857 0 3.611-.463 5.149-1.282" />
+                        </svg>
+                      ) : (
+                        <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12S5.25 5.25 12 5.25 21.75 12 21.75 12 18.75 18.75 12 18.75 2.25 12 2.25 12Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 14.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
