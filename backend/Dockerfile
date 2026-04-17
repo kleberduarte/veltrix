@@ -4,6 +4,7 @@ WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline -q
 COPY src ./src
+# bust cache: v2
 RUN mvn package -DskipTests -q
 
 # Run
