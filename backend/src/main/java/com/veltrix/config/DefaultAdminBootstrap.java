@@ -72,7 +72,7 @@ public class DefaultAdminBootstrap implements ApplicationRunner {
                 .email(adminEmail.trim().toLowerCase())
                 .password(passwordEncoder.encode(adminPassword))
                 .role(Role.ADMIN_EMPRESA)
-                .mustChangePassword(false)
+                .mustChangePassword(true)
                 .build());
 
         log.info("Usuário admin criado: {} (empresa: {}). Altere a senha em produção.", adminEmail, companyName);

@@ -74,7 +74,7 @@ public class GlobalAdminBootstrap implements ApplicationRunner {
                 .email(normalized)
                 .password(passwordEncoder.encode(password))
                 .role(Role.ADM)
-                .mustChangePassword(false)
+                .mustChangePassword(true)
                 .build());
 
         log.info("Usuário Adm Global criado: {} (empresa: {}). Altere a senha em application.properties ou variáveis de ambiente em produção.",

@@ -11,10 +11,15 @@ backend/target/
 frontend/.next/
 frontend/out/
 
-# Environment
+# Environment — nunca versionar arquivos de segredos
 .env
+**/.env
 .env.local
+**/.env.local
 .env.*.local
+**/.env.*.local
+.env.production
+**/.env.production
 
 # OS
 .DS_Store

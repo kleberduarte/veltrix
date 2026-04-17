@@ -1,6 +1,7 @@
 package com.veltrix.exception;
 
 import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -24,15 +26,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
-        return error(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        return error(HttpStatus.UNAUTHORIZED, "Credenciais inválidas");
     }
 
     @ExceptionHandler(InternalAuthenticationServiceException.class)
     public ResponseEntity<Map<String, Object>> handleInternalAuthService(InternalAuthenticationServiceException ex) {
         Throwable cause = ex.getCause();
         if (cause instanceof BadCredentialsException) {
-            return error(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            return error(HttpStatus.UNAUTHORIZED, "Credenciais inválidas");
         }
+        log.error("Erro interno de autenticação", ex);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno durante autenticação");
     }
 
@@ -62,6 +65,9 @@ public class GlobalExceptionHandler {
         if (msg == null || msg.isBlank()) {
             msg = status.getReasonPhrase();
         }
+        if (status.is5xxServerError()) {
+            log.error("ResponseStatusException {}: {}", status.value(), msg, ex);
+        }
         return error(status, msg);
     }
 
@@ -90,6 +96,7 @@ public class GlobalExceptionHandler {
                 return error(HttpStatus.BAD_REQUEST, "CPF já cadastrado para esta empresa");
             }
         }
+        log.warn("DataIntegrityViolationException: {}", m);
         return error(HttpStatus.BAD_REQUEST, "Violação de integridade dos dados.");
     }
 
@@ -108,7 +115,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+        log.error("Erro inesperado", ex);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Ocorreu um erro inesperado. Tente novamente.");
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {

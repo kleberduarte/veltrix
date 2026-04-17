@@ -1,6 +1,7 @@
 package com.veltrix.repository;
 
 import com.veltrix.model.Order;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,8 +11,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByCompanyIdOrderByCreatedAtDesc(Long companyId);
 
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    @Query("SELECT o FROM Order o WHERE o.companyId = :companyId ORDER BY o.createdAt DESC")
+    List<Order> findByCompanyIdOrderByCreatedAtDesc(@Param("companyId") Long companyId);
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
     @Query("SELECT o FROM Order o WHERE o.companyId = :companyId AND o.createdAt >= :start AND o.createdAt < :end ORDER BY o.createdAt DESC")
     List<Order> findByCompanyIdAndCreatedAtBetween(
             @Param("companyId") Long companyId,

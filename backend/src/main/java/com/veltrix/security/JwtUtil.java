@@ -2,10 +2,12 @@ package com.veltrix.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
@@ -17,10 +19,16 @@ public class JwtUtil {
     @Value("${veltrix.jwt.expiration}")
     private long expiration;
 
-    private SecretKey getKey() {
-        byte[] keyBytes = java.util.Base64.getEncoder().encodeToString(secret.getBytes()).getBytes();
-        return Keys.hmacShaKeyFor(io.jsonwebtoken.io.Decoders.BASE64.decode(
-                java.util.Base64.getEncoder().encodeToString(secret.getBytes())));
+    private SecretKey cachedKey;
+
+    @PostConstruct
+    private void init() {
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                "veltrix.jwt.secret deve ter no mínimo 32 caracteres para HMAC-SHA256.");
+        }
+        this.cachedKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Long userId, Long companyId, String email, String role) {
@@ -31,13 +39,13 @@ public class JwtUtil {
                 .claim("role", role)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getKey())
+                .signWith(cachedKey)
                 .compact();
     }
 
     public Claims extractClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getKey())
+                .verifyWith(cachedKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
