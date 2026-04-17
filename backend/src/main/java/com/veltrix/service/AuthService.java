@@ -67,8 +67,8 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Código de convite inválido ou expirado. Solicite um novo código ao administrador."));
 
         boolean definirSenhaSóNoPrimeiroAcesso = !StringUtils.hasText(request.getPassword());
-        if (!definirSenhaSóNoPrimeiroAcesso && request.getPassword().length() < 4) {
-            throw new IllegalArgumentException("Senha deve ter pelo menos 4 caracteres.");
+        if (!definirSenhaSóNoPrimeiroAcesso && request.getPassword().length() < 8) {
+            throw new IllegalArgumentException("Senha deve ter pelo menos 8 caracteres.");
         }
         String senhaInterna = definirSenhaSóNoPrimeiroAcesso
                 ? passwordEncoder.encode(UUID.randomUUID().toString() + UUID.randomUUID())
@@ -187,6 +187,9 @@ public class AuthService {
             if (request.getPassword().length() < 4) {
                 throw new IllegalArgumentException("Senha deve ter pelo menos 4 caracteres");
             }
+            if (request.getPassword().length() < 8) {
+                throw new IllegalArgumentException("Senha deve ter pelo menos 8 caracteres");
+            }
             plain = request.getPassword();
             gerada = false;
         }
@@ -248,8 +251,8 @@ public class AuthService {
         if (!Boolean.TRUE.equals(user.getMustChangePassword()) || !Boolean.TRUE.equals(user.getInviteSelfRegistration())) {
             throw new IllegalArgumentException("Esta operação não se aplica ao seu usuário.");
         }
-        if (request.getNovaSenha().length() < 6) {
-            throw new IllegalArgumentException("A nova senha deve ter pelo menos 6 caracteres.");
+        if (request.getNovaSenha().length() < 8) {
+            throw new IllegalArgumentException("A nova senha deve ter pelo menos 8 caracteres.");
         }
         user.setPassword(passwordEncoder.encode(request.getNovaSenha()));
         user.setMustChangePassword(false);
@@ -292,6 +295,7 @@ public class AuthService {
         return companyRepository.findById(tid).orElse(user.getCompany());
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponse> listUsers() {
         getCurrentUser();
         Long cid = TenantContext.getCompanyId();
@@ -388,8 +392,8 @@ public class AuthService {
         }
 
         if (StringUtils.hasText(request.getPassword())) {
-            if (request.getPassword().length() < 4) {
-                throw new IllegalArgumentException("Senha deve ter pelo menos 4 caracteres");
+            if (request.getPassword().length() < 8) {
+                throw new IllegalArgumentException("Senha deve ter pelo menos 8 caracteres");
             }
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setMustChangePassword(false);

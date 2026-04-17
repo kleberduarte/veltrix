@@ -200,8 +200,8 @@ export default function UsuariosPage() {
         companyId: isAdm ? createForm.companyId : undefined,
       }
       if (!gerarSenhaAuto) {
-        if (!createForm.password || createForm.password.length < 4) {
-          setError('Informe uma senha com pelo menos 4 caracteres ou marque senha automática.')
+        if (!createForm.password || createForm.password.length < 8) {
+          setError('Informe uma senha com pelo menos 8 caracteres ou marque senha automática.')
           setSaving(false)
           return
         }
