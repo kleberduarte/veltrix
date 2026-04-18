@@ -20,6 +20,10 @@
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <!-- Defaults for mvn flyway:* (align with application.properties; override with -Dflyway.password=...) -->
+        <flyway.url>jdbc:mysql://localhost:3306/veltrix?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Sao_Paulo</flyway.url>
+        <flyway.user>root</flyway.user>
+        <flyway.password>1234</flyway.password>
     </properties>
 
     <dependencies>
@@ -109,6 +113,11 @@
             <plugin>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
+                <configuration>
+                    <url>${flyway.url}</url>
+                    <user>${flyway.user}</user>
+                    <password>${flyway.password}</password>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
