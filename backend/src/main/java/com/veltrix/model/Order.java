@@ -3,6 +3,9 @@ package com.veltrix.model;
 import com.veltrix.model.enums.FormaPagamento;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -44,7 +47,8 @@ public class Order {
     private BigDecimal total;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "forma_pagamento", nullable = false, length = 20, columnDefinition = "varchar(20)")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "forma_pagamento", nullable = false, length = 20)
     @Builder.Default
     private FormaPagamento formaPagamento = FormaPagamento.DINHEIRO;
 

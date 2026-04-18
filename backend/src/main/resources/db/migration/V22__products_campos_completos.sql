@@ -1,0 +1,21 @@
+-- Product evoluiu muito além do V1 (só name/price/stock/active); alinha com com.veltrix.model.Product
+ALTER TABLE products
+    ADD COLUMN codigo_produto VARCHAR(255) NULL,
+    ADD COLUMN gtin_ean VARCHAR(255) NULL,
+    ADD COLUMN descricao TEXT NULL,
+    ADD COLUMN categoria VARCHAR(255) NULL,
+    ADD COLUMN preco_promocional DECIMAL(10, 2) NULL,
+    ADD COLUMN promocao_inicio DATE NULL,
+    ADD COLUMN promocao_fim DATE NULL,
+    ADD COLUMN em_promocao TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN promo_qtd_levar INT NOT NULL DEFAULT 0,
+    ADD COLUMN promo_qtd_pagar INT NOT NULL DEFAULT 0,
+    ADD COLUMN estoque_minimo INT NOT NULL DEFAULT 0,
+    ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'UNIDADE',
+    ADD COLUMN tipo_controle VARCHAR(30) NOT NULL DEFAULT 'COMUM',
+    ADD COLUMN exige_receita TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN exige_lote TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN exige_validade TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN registro_ms VARCHAR(255) NULL,
+    ADD COLUMN pmc DECIMAL(10, 2) NULL,
+    ADD COLUMN updated_at DATETIME(6) NULL;

@@ -4,6 +4,9 @@ import com.veltrix.model.enums.TipoControle;
 import com.veltrix.model.enums.TipoProduto;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -71,13 +74,15 @@ public class Product {
     @Builder.Default
     private Integer estoqueMinimo = 0;
 
-    // Tipo
+    // Tipo (VARCHAR — evita ENUM nativo MySQL no schema validate)
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     @Builder.Default
     private TipoProduto tipo = TipoProduto.UNIDADE;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "tipo_controle", length = 30)
     @Builder.Default
     private TipoControle tipoControle = TipoControle.COMUM;
