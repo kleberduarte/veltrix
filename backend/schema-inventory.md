@@ -9,7 +9,7 @@ Atualizado após auditoria: alinhar PRD (`ddl-auto=validate`) com migrations.
 | `companies` | V1 + V3,V5,V6,V12,V13,V14 | OK |
 | `users` | V1 + V2,V4,V15 + **V23** (telefone, must_change_password) | |
 | `products` | V1 + **V22** (campos farmácia/promo/tipo) | V1 era mínimo |
-| `orders` | V1 + V9 Java + **V21** + `Order.forma_pagamento` como VARCHAR | |
+| `orders` | V1 + V9 Java + **V21** + **V24** (`forma_pagamento` se V9 não criou) + `Order.forma_pagamento` VARCHAR | V9 Java faz *no-op* se a coluna não existia |
 | `order_items` | V1 + **V20** | |
 | `cash_flow` | V1 | OK (campos batem com entidade) |
 | `pdv_terminais` | V4 | OK |
