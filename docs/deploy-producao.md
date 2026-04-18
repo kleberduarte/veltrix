@@ -50,19 +50,27 @@ O browser chama a API **diretamente** (CORS). Não é necessário proxy da API p
 
 ### 3.1 Repositório monorepo (`backend/` + `frontend/`)
 
-**Obrigatório:** na Vercel, o app Next.js **não está na raiz do Git**. O build precisa rodar **dentro de `frontend/`**.
+O app Next.js está em **`frontend/`**, não na raiz do Git.
 
-1. Vercel → projeto → **Settings → General**:
-   - **Root Directory** → `frontend` → **Save** (não deixe vazio).
-   - **Framework Preset** → **Next.js** (ou detecção automática a partir da pasta).
-   - **Output Directory** → deixe **vazio** (padrão do Next na Vercel). Se estiver `public`, apague — isso causa o erro *“No Output Directory named public found”* após um `next build` bem-sucedido.
-2. **Redeploy** (Deployments → ⋮ → Redeploy).
+### Configuração recomendada (evita erros de deploy)
 
-**Por quê:** `buildCommand` na raiz (`cd frontend && npm run build`) até compila o Next, mas a etapa de deploy da Vercel não associa o output a `.next` como em um projeto Next nativo; o preset na raiz vira “site estático” e ela procura `public/`. Com **Root Directory = `frontend`**, a Vercel usa o pipeline correto do Next.
+1. Vercel → **Settings → General**:
+   - **Root Directory** → `frontend` → **Save**.
+   - **Output Directory** → **vazio** (se estiver `public`, apague).
+2. **Redeploy**.
 
-O `package.json` na raiz do repo é só conveniência local (`npm run build` delegando ao `frontend`); **o deploy na Vercel deve usar Root Directory = `frontend`**.
+Com isso, a Vercel faz `npm install` e `npm run build` **dentro de `frontend/`** e usa o pipeline nativo do Next.
 
-Se aparecer **`404 NOT_FOUND`** no `/`, confira Root Directory, deploy **Ready** e logs de build.
+### Se deixar Root Directory vazio (raiz do repo)
+
+O repositório inclui `vercel.json` na raiz com `framework: nextjs`, `installCommand` e `buildCommand` em `frontend/`, e o `package.json` da raiz roda `cd frontend && npm install && npm run build` para existir `node_modules` com o `next`.
+
+Se aparecer **`next: command not found`**, a Vercel rodou `npm install` só na raiz — use **Root Directory = `frontend`** ou garanta o último commit com esse `package.json` / `vercel.json`.
+
+### Erros conhecidos
+
+- *“No Output Directory named public”* após build OK: geralmente **Output Directory** preenchido com `public` ou preset errado; deixe vazio e prefira **Root Directory = `frontend`**.
+- **`404 NOT_FOUND`** no `/` ou no domínio Vercel: confira Root Directory, deploy **Ready** e logs de build.
 
 ### 3.2 Variáveis e build
 
