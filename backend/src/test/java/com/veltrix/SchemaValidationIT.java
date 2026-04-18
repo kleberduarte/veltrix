@@ -8,10 +8,12 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Base MySQL limpa: aplica todas as migrations Flyway e valida o schema contra as entidades JPA
  * ({@code ddl-auto=validate}), como em produção. Requer Docker (Testcontainers).
+ * Imagem alinhada ao Railway (MySQL 9.x).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Testcontainers
@@ -20,7 +22,7 @@ class SchemaValidationIT {
 
     @Container
     @SuppressWarnings("resource")
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+    static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse("mysql:9.4"))
             .withDatabaseName("veltrix")
             .withUsername("root")
             .withPassword("test");

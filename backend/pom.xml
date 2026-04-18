@@ -20,6 +20,8 @@
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <!-- Railway MySQL 9.x: Flyway 9.x só declara suporte até 8.0; 11.15+ cobre MySQL 9.4 (evita falha/avisos em migrate). -->
+        <flyway.version>11.15.0</flyway.version>
         <!-- Defaults for mvn flyway:* (align with application.properties; override with -Dflyway.password=...) -->
         <flyway.url>jdbc:mysql://localhost:3306/veltrix?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Sao_Paulo</flyway.url>
         <flyway.user>root</flyway.user>

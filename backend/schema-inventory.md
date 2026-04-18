@@ -2,6 +2,8 @@
 
 Atualizado após auditoria: alinhar PRD (`ddl-auto=validate`) com migrations.
 
+**MySQL 9 (Railway):** o `pom.xml` fixa `flyway.version` ≥ **11.15** (o BOM do Spring Boot 3.2 trazia Flyway 9.x, que só declara suporte até MySQL 8.0). Sem isso, o migrate no servidor pode falhar ou ficar instável no MySQL 9.4.
+
 ## Entidades (`@Table`)
 
 | Tabela | Cobertura Flyway | Notas |
