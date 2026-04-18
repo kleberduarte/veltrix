@@ -13,6 +13,10 @@ Sistema web de gestão para restaurantes, delivery e pequenos comércios (retagu
 - **`main`**: linha estável.
 - **`develop`**: integração do dia a dia; mudanças seguem para `main` via pull request.
 
+## Deploy produção (Railway + Vercel)
+
+Backend e MySQL no **Railway** (Docker em `backend/Dockerfile`), frontend no **Vercel**. Checklist, variáveis e CORS: [**docs/deploy-producao.md**](docs/deploy-producao.md). Referência rápida de env do Railway: `backend/.env.railway.example`.
+
 ---
 
 ## Pré-requisitos
