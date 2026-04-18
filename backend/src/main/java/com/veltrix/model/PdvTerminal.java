@@ -3,6 +3,9 @@ package com.veltrix.model;
 import com.veltrix.model.enums.StatusCaixa;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,7 +37,8 @@ public class PdvTerminal {
     private LocalDateTime ultimoHeartbeat;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status_caixa", length = 20)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "status_caixa", nullable = false, length = 20)
     @Builder.Default
     private StatusCaixa statusCaixa = StatusCaixa.LIVRE;
 
