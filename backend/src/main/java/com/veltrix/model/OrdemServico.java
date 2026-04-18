@@ -3,6 +3,9 @@ package com.veltrix.model;
 import com.veltrix.model.enums.StatusOrdemServico;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -80,8 +83,9 @@ public class OrdemServico {
     @Builder.Default
     private BigDecimal valorTotal = BigDecimal.ZERO;
 
-    // Status e datas
+    // Status e datas (VARCHAR como em User.role — evita ENUM nativo MySQL no validate)
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private StatusOrdemServico status = StatusOrdemServico.ABERTA;
