@@ -102,10 +102,6 @@ export default function RelatoriosPage() {
   return (
     <AppLayout title="Relatórios">
       <div className="space-y-8">
-        <p className="text-gray-500 text-sm">
-          Resumo de <strong>hoje</strong> (API), período customizado com agregação no servidor e lista de pedidos filtrada (<code className="text-xs bg-gray-100 px-1 rounded">GET /reports/period</code>, <code className="text-xs bg-gray-100 px-1 rounded">GET /orders?from=&amp;to=</code>).
-        </p>
-
         {loading ? (
           <div className="text-center py-16 text-gray-400">Carregando...</div>
         ) : (
