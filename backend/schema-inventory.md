@@ -11,7 +11,7 @@ Atualizado após auditoria: alinhar PRD (`ddl-auto=validate`) com migrations.
 | `companies` | V1 + V3,V5,V6,V12,V13,V14 | OK |
 | `users` | V1 + V2,V4,V15 + **V23** (telefone, must_change_password) | |
 | `products` | V1 + **V22** (campos farmácia/promo/tipo) | V1 era mínimo |
-| `orders` | V1 + V9 Java + **V21** + **V24** (`forma_pagamento` se V9 não criou) + `Order.forma_pagamento` VARCHAR | V9 Java faz *no-op* se a coluna não existia |
+| `orders` | V1 + V9 Java + **V21** + **V24** (no-op; histórico) + **V25** (Java: garante `forma_pagamento`) + `Order.forma_pagamento` VARCHAR | V9 Java faz *no-op* se a coluna não existia; V24 antigo com SQL problemático foi substituído por no-op + V25 |
 | `order_items` | V1 + **V20** | |
 | `cash_flow` | V1 | OK (campos batem com entidade) |
 | `pdv_terminais` | V4 | OK |
@@ -25,6 +25,11 @@ Atualizado após auditoria: alinhar PRD (`ddl-auto=validate`) com migrations.
 ## Migrations Java
 
 - **V9** — `forma_pagamento` em `orders` (rebuild coluna).
+- **V25** — garante coluna `forma_pagamento` se ainda não existir (idempotente).
+
+## Flyway "failed" / checksum (Railway)
+
+Se aparecer `Detected failed migration to version 24` ou checksum de V24: o backend executa `repair()` antes de `migrate()` (configurável). Migração **V24** no repo é um no-op; a coluna é criada na **V25** (Java).
 
 ## Risco DES local
 
