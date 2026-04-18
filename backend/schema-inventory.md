@@ -28,6 +28,16 @@ Atualizado após auditoria: alinhar PRD (`ddl-auto=validate`) com migrations.
 
 Se `ddl-auto=update` já criou colunas, `ALTER TABLE ... ADD` pode falhar (duplicado). Nesse caso: base nova, ou remover colunas duplicadas com cuidado, ou `flyway repair` conforme caso.
 
+## Verificação antes de deploy (recomendado)
+
+Com Docker ativo, no diretório `backend`:
+
+```bash
+mvn verify
+```
+
+O teste `SchemaValidationIT` sobe um MySQL 8 (Testcontainers), aplica **todas** as migrations Flyway e inicia o contexto com `ddl-auto=validate` (igual à produção). Se houver divergência entidade ↔ tabela, o build falha antes do deploy.
+
 ## Próximos deploys
 
-Com **V22** e **V23**, o validate deve cobrir **Product** e **User** por completo. Se ainda falhar, copiar a linha exata `Schema-validation: ...` do log.
+Com migrations até **V24**, o validate cobre **Order.forma_pagamento** em bases onde a V9 Java não criou a coluna. Se ainda falhar, copiar a linha exata `Schema-validation: ...` do log.

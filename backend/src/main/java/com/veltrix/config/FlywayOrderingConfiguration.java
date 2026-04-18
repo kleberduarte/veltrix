@@ -1,19 +1,21 @@
 package com.veltrix.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Garante {@code outOfOrder=true} no Flyway mesmo quando variáveis de ambiente no Railway
- * (ex.: {@code SPRING_FLYWAY_OUT_OF_ORDER}) têm precedência sobre {@code application*.properties},
- * o que impedia aplicar a migração Java V9 em bases com histórico em gap (V10+ sem V9).
+ * Aplica explicitamente {@code spring.flyway.out-of-order} no Flyway (default {@code true}),
+ * para bases com histórico em gap (ex.: V10+ aplicado antes da V9 Java) sem ignorar
+ * {@code FLYWAY_OUT_OF_ORDER=false} quando quiser modo estrito.
  */
 @Configuration
 public class FlywayOrderingConfiguration {
 
     @Bean
-    public FlywayConfigurationCustomizer flywayOutOfOrder() {
-        return configuration -> configuration.outOfOrder(true);
+    public FlywayConfigurationCustomizer flywayOutOfOrder(
+            @Value("${spring.flyway.out-of-order:true}") boolean outOfOrder) {
+        return configuration -> configuration.outOfOrder(outOfOrder);
     }
 }
