@@ -3,6 +3,8 @@ package com.veltrix.model;
 import com.veltrix.model.enums.Segmento;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "parametros_empresa")
@@ -60,9 +62,10 @@ public class ParametroEmpresa {
     @Column(name = "suporte_whatsapp")
     private String suporteWhatsapp;
 
-    // Segmento e módulos
+    // Segmento e módulos — VARCHAR no Flyway (V10_1); Hibernate 6 + MySQL 9 validava como ENUM nativo sem isto.
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "segmento", length = 20, nullable = false)
     @Builder.Default
     private Segmento segmento = Segmento.GERAL;
 
