@@ -15,7 +15,7 @@ Sistema web de gestão para restaurantes, delivery e pequenos comércios (retagu
 
 ## Deploy produção (Railway + Vercel)
 
-Backend e MySQL no **Railway** (Docker em `backend/Dockerfile`), frontend no **Vercel**. No painel da Vercel, defina **Root Directory** = `frontend` (ou use o `vercel.json` na raiz do repo). Checklist, variáveis, CORS e 404: [**docs/deploy-producao.md**](docs/deploy-producao.md). Env Railway: `backend/.env.railway.example`.
+Backend e MySQL no **Railway** (Docker em `backend/Dockerfile`), frontend no **Vercel**. No painel da Vercel, defina **Root Directory** = `frontend` e **Output Directory** vazio (veja `docs/deploy-producao.md` se aparecer erro de `public`). Checklist, variáveis e CORS: [**docs/deploy-producao.md**](docs/deploy-producao.md). Env Railway: `backend/.env.railway.example`.
 
 ---
 

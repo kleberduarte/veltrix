@@ -50,19 +50,19 @@ O browser chama a API **diretamente** (CORS). Não é necessário proxy da API p
 
 ### 3.1 Repositório monorepo (`backend/` + `frontend/`)
 
-Escolha **uma** das formas (as duas funcionam; use só uma para não duplicar lógica):
+**Obrigatório:** na Vercel, o app Next.js **não está na raiz do Git**. O build precisa rodar **dentro de `frontend/`**.
 
-**Opção A (recomendada)** — avisar à Vercel onde está o Next.js:
+1. Vercel → projeto → **Settings → General**:
+   - **Root Directory** → `frontend` → **Save** (não deixe vazio).
+   - **Framework Preset** → **Next.js** (ou detecção automática a partir da pasta).
+   - **Output Directory** → deixe **vazio** (padrão do Next na Vercel). Se estiver `public`, apague — isso causa o erro *“No Output Directory named public found”* após um `next build` bem-sucedido.
+2. **Redeploy** (Deployments → ⋮ → Redeploy).
 
-1. Vercel → projeto → **Settings → General → Root Directory** → `frontend` → Save.
-2. **Redeploy** o último deploy (Deployments → ⋮ → Redeploy).
+**Por quê:** `buildCommand` na raiz (`cd frontend && npm run build`) até compila o Next, mas a etapa de deploy da Vercel não associa o output a `.next` como em um projeto Next nativo; o preset na raiz vira “site estático” e ela procura `public/`. Com **Root Directory = `frontend`**, a Vercel usa o pipeline correto do Next.
 
-**Opção B** — deixar Root Directory vazio (raiz do repo):
+O `package.json` na raiz do repo é só conveniência local (`npm run build` delegando ao `frontend`); **o deploy na Vercel deve usar Root Directory = `frontend`**.
 
-- O repositório já inclui `vercel.json` na raiz com `buildCommand` / `installCommand` apontando para `frontend/`, e um `package.json` na raiz com `npm run build` delegando ao Next.
-- Após o push, faça **Redeploy**.
-
-Se aparecer **`404 NOT_FOUND`** em `*.vercel.app` no `/`, quase sempre falta a **Opção A** (Root Directory = `frontend`) ou o último deploy **falhou** (veja os logs de build).
+Se aparecer **`404 NOT_FOUND`** no `/`, confira Root Directory, deploy **Ready** e logs de build.
 
 ### 3.2 Variáveis e build
 
