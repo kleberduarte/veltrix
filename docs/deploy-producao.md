@@ -48,18 +48,39 @@ O browser chama a API **diretamente** (CORS). Não é necessário proxy da API p
 
 ## 3. Vercel — Frontend
 
-1. Projeto Next.js na raiz **`frontend`** (ou configure **Root Directory** = `frontend` no Vercel).
-2. **Environment Variables** (Production / Preview conforme necessário):
+### 3.1 Repositório monorepo (`backend/` + `frontend/`)
+
+Escolha **uma** das formas (as duas funcionam; use só uma para não duplicar lógica):
+
+**Opção A (recomendada)** — avisar à Vercel onde está o Next.js:
+
+1. Vercel → projeto → **Settings → General → Root Directory** → `frontend` → Save.
+2. **Redeploy** o último deploy (Deployments → ⋮ → Redeploy).
+
+**Opção B** — deixar Root Directory vazio (raiz do repo):
+
+- O repositório já inclui `vercel.json` na raiz com `buildCommand` / `installCommand` apontando para `frontend/`, e um `package.json` na raiz com `npm run build` delegando ao Next.
+- Após o push, faça **Redeploy**.
+
+Se aparecer **`404 NOT_FOUND`** em `*.vercel.app` no `/`, quase sempre falta a **Opção A** (Root Directory = `frontend`) ou o último deploy **falhou** (veja os logs de build).
+
+### 3.2 Variáveis e build
+
+1. **Environment Variables** (Production / Preview conforme necessário):
 
    | Variável | Valor |
    |----------|--------|
    | `NEXT_PUBLIC_API_URL` | URL pública do backend Railway, **sem barra final** (ex.: `https://seu-servico.up.railway.app`). |
 
-3. **Redeploy** após alterar variáveis (elas são embutidas no build do Next).
+2. **Redeploy** após alterar variáveis (elas são embutidas no build do Next).
 
-4. **Deploys de preview** (branches/PR): cada URL `*.vercel.app` é uma origem diferente. O Spring **não** aceita curinga de subdomínio em CORS com `credentials`. Opções:
+3. **Deploys de preview** (branches/PR): cada URL `*.vercel.app` é uma origem diferente. O Spring **não** aceita curinga de subdomínio em CORS com `credentials`. Opções:
    - adicionar temporariamente a URL do preview em `CORS_ALLOWED_ORIGINS` no Railway, ou
    - testar só contra o deploy de **Production** com o domínio fixo.
+
+### 3.3 Erro no browser (não é o app)
+
+Mensagem do tipo *“A listener indicated an asynchronous response…”* costuma ser **extensão do Chrome**. Teste em aba anônima ou outro navegador.
 
 ---
 
