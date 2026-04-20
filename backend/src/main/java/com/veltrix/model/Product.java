@@ -39,6 +39,10 @@ public class Product {
     @Column
     private String categoria;
 
+    /** URL https da imagem do produto (cardápio / totem); arquivo fica em CDN, bucket ou pasta pública. */
+    @Column(name = "imagem_url", length = 2048)
+    private String imagemUrl;
+
     // Preços
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;

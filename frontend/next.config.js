@@ -13,6 +13,10 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  /** ProductThumb / totem: unoptimized para aceitar qualquer CDN; uploads em /files da API também. */
+  images: {
+    dangerouslyAllowSVG: false,
+  },
   async headers() {
     return [
       {

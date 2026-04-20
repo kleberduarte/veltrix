@@ -5,6 +5,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADM: 'Adm Global',
   ADMIN_EMPRESA: 'Adm Empresa',
   VENDEDOR: 'Vendedor',
+  TOTEM: 'Totem',
 }
 
 const VENDEDOR_FORBIDDEN_PREFIXES = [
@@ -17,7 +18,9 @@ const VENDEDOR_FORBIDDEN_PREFIXES = [
   '/suporte',
 ]
 
+/** Destino pós-login / troca de senha para perfis de frente de loja. */
 export function defaultHomePath(role: string | undefined): string {
+  if (role === 'TOTEM') return '/totem'
   if (role === 'VENDEDOR') return '/pdv'
   return '/dashboard'
 }
@@ -39,6 +42,10 @@ export function canAccessOrdemServicoByCompany(
 /** Rotas do layout ERP que o vendedor não deve abrir (API já restringe). */
 export function canAccessErpRoute(role: string | undefined, pathname: string): boolean {
   if (!role || role === 'ADM' || role === 'ADMIN_EMPRESA') return true
+  if (role === 'TOTEM') {
+    if (pathname === '/primeiro-acesso') return true
+    return pathname === '/totem' || pathname.startsWith('/totem/')
+  }
   if (role !== 'VENDEDOR') return true
   return !VENDEDOR_FORBIDDEN_PREFIXES.some(
     p => pathname === p || pathname.startsWith(`${p}/`)

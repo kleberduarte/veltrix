@@ -17,6 +17,9 @@ public class ProductRequest {
     private String descricao;
     private String categoria;
 
+    /** URL da imagem (totem / cardápio); opcional. */
+    private String imagemUrl;
+
     @NotNull @DecimalMin("0.01")
     private BigDecimal price;
 

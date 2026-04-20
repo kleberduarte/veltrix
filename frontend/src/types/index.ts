@@ -8,6 +8,8 @@ export interface Product {
   gtinEan?: string | null
   descricao?: string | null
   categoria?: string | null
+  /** URL https da foto no cardápio / totem (CDN, storage ou link público). */
+  imagemUrl?: string | null
   price: number
   precoPromocional?: number | null
   emPromocao?: boolean
@@ -32,7 +34,7 @@ export interface OrderItem {
   subtotal: number
 }
 
-export type FormaPagamento = 'DINHEIRO' | 'DEBITO' | 'CARTAO' | 'PIX'
+export type FormaPagamento = 'DINHEIRO' | 'DEBITO' | 'CARTAO' | 'PIX' | 'VOUCHER'
 
 export interface Order {
   id: number
@@ -73,8 +75,15 @@ export interface CartItem {
   loteValidade?: string
 }
 
-export type Segmento = 'GERAL' | 'FARMACIA' | 'INFORMATICA'
-export type Role = 'ADM' | 'ADMIN_EMPRESA' | 'VENDEDOR'
+export type Segmento = 'GERAL' | 'FARMACIA' | 'INFORMATICA' | 'FAST_FOOD'
+export type TipoEstabelecimentoFastFood =
+  | 'HAMBURGUERIA'
+  | 'PIZZARIA'
+  | 'RESTAURANTE'
+  | 'LANCHONETE'
+  | 'ACAI_SORVETERIA'
+  | 'OUTROS'
+export type Role = 'ADM' | 'ADMIN_EMPRESA' | 'VENDEDOR' | 'TOTEM'
 export type StatusOrdemServico =
   | 'ABERTA'
   | 'EM_ANALISE'
@@ -119,6 +128,8 @@ export interface ParametroEmpresa {
   farmaciaPmcAtivo?: boolean | null
   farmaciaPmcModo?: string | null
   moduloInformaticaAtivo?: boolean | null
+  moduloFastFoodAtivo?: boolean | null
+  tipoEstabelecimentoFastFood?: TipoEstabelecimentoFastFood | null
   cnpj?: string | null
   inscricaoMunicipal?: string | null
   telefoneComercial?: string | null
@@ -145,6 +156,8 @@ export interface ResumoDia {
   totalCartao: number
   totalDebito: number
   totalPix: number
+  /** Vale refeição (voucher) — vendas PDV Fast Food */
+  totalVoucher: number
   totalGeral: number
   jaFechado: boolean
 }
@@ -159,6 +172,7 @@ export interface FechamentoCaixaRow {
   totalCartao: number
   totalDebito: number
   totalPix: number
+  totalVoucher: number
   totalGeral: number
   valorInformadoDinheiro: number
   diferencaDinheiro: number

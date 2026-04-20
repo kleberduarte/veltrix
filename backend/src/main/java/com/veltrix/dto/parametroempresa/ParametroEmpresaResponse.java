@@ -1,6 +1,7 @@
 package com.veltrix.dto.parametroempresa;
 
 import com.veltrix.model.enums.Segmento;
+import com.veltrix.model.enums.TipoEstabelecimentoFastFood;
 import lombok.Data;
 
 @Data
@@ -27,6 +28,8 @@ public class ParametroEmpresaResponse {
     private Boolean farmaciaPmcAtivo;
     private String farmaciaPmcModo;
     private Boolean moduloInformaticaAtivo;
+    private Boolean moduloFastFoodAtivo;
+    private TipoEstabelecimentoFastFood tipoEstabelecimentoFastFood;
     private String cnpj;
     private String inscricaoMunicipal;
     private String telefoneComercial;

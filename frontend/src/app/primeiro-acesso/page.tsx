@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { getAuth, isAuthenticated } from '@/lib/auth'
+import { defaultHomePath } from '@/lib/roleAccess'
 
 export default function PrimeiroAcessoPage() {
   const router = useRouter()
@@ -68,7 +69,7 @@ export default function PrimeiroAcessoPage() {
         await authService.changePassword(senhaAtual, novaSenha)
       }
       const role = getAuth()?.role
-      router.replace(role === 'VENDEDOR' ? '/pdv' : '/dashboard')
+      router.replace(defaultHomePath(role))
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } }
       setError(ax.response?.data?.error || 'Não foi possível alterar a senha.')

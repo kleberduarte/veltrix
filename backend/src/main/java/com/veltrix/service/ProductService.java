@@ -51,6 +51,7 @@ public class ProductService {
                 .name(request.getName())
                 .descricao(request.getDescricao())
                 .categoria(request.getCategoria())
+                .imagemUrl(trimOrNull(request.getImagemUrl()))
                 .price(request.getPrice())
                 .precoPromocional(request.getPrecoPromocional())
                 .promocaoInicio(request.getPromocaoInicio())
@@ -80,6 +81,7 @@ public class ProductService {
         product.setGtinEan(request.getGtinEan());
         product.setDescricao(request.getDescricao());
         product.setCategoria(request.getCategoria());
+        product.setImagemUrl(trimOrNull(request.getImagemUrl()));
         product.setPrice(request.getPrice());
         product.setPrecoPromocional(request.getPrecoPromocional());
         product.setPromocaoInicio(request.getPromocaoInicio());
@@ -148,6 +150,7 @@ public class ProductService {
         r.setGtinEan(p.getGtinEan());
         r.setDescricao(p.getDescricao());
         r.setCategoria(p.getCategoria());
+        r.setImagemUrl(p.getImagemUrl());
         r.setPrice(p.getPrice());
         r.setPrecoPromocional(p.getPrecoPromocional());
         r.setPromocaoInicio(p.getPromocaoInicio());
@@ -168,5 +171,11 @@ public class ProductService {
         r.setPrecoEfetivo(calcularPrecoEfetivo(p, 1));
         r.setCreatedAt(p.getCreatedAt());
         return r;
+    }
+
+    private static String trimOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 }

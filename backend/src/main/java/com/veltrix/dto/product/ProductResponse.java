@@ -15,6 +15,7 @@ public class ProductResponse {
     private String gtinEan;
     private String descricao;
     private String categoria;
+    private String imagemUrl;
     private BigDecimal price;
     private BigDecimal precoPromocional;
     private LocalDate promocaoInicio;

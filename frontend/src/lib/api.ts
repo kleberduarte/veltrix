@@ -23,6 +23,9 @@ function isPublicAuthRequest(config: InternalAxiosRequestConfig): boolean {
 }
 
 api.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   if (typeof window !== 'undefined') {
     if (isPublicAuthRequest(config)) {
       delete config.headers.Authorization

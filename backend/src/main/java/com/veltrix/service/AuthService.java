@@ -194,8 +194,8 @@ public class AuthService {
             gerada = false;
         }
         boolean mustChange;
-        if (request.getRole() == Role.VENDEDOR) {
-            // Regra legado: vendedor criado pelo admin troca senha apenas quando ela foi gerada automaticamente.
+        if (request.getRole() == Role.VENDEDOR || request.getRole() == Role.TOTEM) {
+            // Vendedor/totem: troca senha apenas quando gerada automaticamente.
             mustChange = gerada;
         } else {
             mustChange = Boolean.TRUE.equals(request.getMustChangePassword()) || gerada;
@@ -349,7 +349,7 @@ public class AuthService {
     @Transactional
     public PdvInviteResponse regeneratePdvInviteCode() {
         User current = getCurrentUser();
-        if (current.getRole() == Role.VENDEDOR) {
+        if (current.getRole() == Role.VENDEDOR || current.getRole() == Role.TOTEM) {
             throw new IllegalStateException("Sem permissão para gerar código de convite.");
         }
         Company company = resolveTenantCompany(current);

@@ -1,6 +1,7 @@
 package com.veltrix.model;
 
 import com.veltrix.model.enums.Segmento;
+import com.veltrix.model.enums.TipoEstabelecimentoFastFood;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -98,6 +99,16 @@ public class ParametroEmpresa {
     @Column(name = "modulo_informatica_ativo")
     @Builder.Default
     private Boolean moduloInformaticaAtivo = false;
+
+    // Módulo Fast Food / Totem
+    @Column(name = "modulo_fast_food_ativo")
+    @Builder.Default
+    private Boolean moduloFastFoodAtivo = false;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "tipo_estabelecimento_fast_food", length = 32)
+    private TipoEstabelecimentoFastFood tipoEstabelecimentoFastFood;
 
     @Column(name = "cnpj")
     private String cnpj;

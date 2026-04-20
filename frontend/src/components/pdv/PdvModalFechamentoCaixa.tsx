@@ -97,6 +97,10 @@ export default function PdvModalFechamentoCaixa({ open, onClose, terminalId }: P
               <span>Total PIX</span>
               <span className="font-numeric">{fmt(resumo.totalPix)}</span>
             </div>
+            <div className="flex justify-between px-3 py-2">
+              <span>Vale refeição (voucher)</span>
+              <span className="font-numeric">{fmt(resumo.totalVoucher ?? 0)}</span>
+            </div>
             <div className="flex justify-between px-3 py-2 font-bold text-gray-900">
               <span>Total geral</span>
               <span className="font-numeric">{fmt(resumo.totalGeral)}</span>

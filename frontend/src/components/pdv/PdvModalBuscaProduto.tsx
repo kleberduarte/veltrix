@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import ProductThumb from '@/components/product/ProductThumb'
 import { Product } from '@/types'
 
 function fmt(value: number) {
@@ -77,6 +78,9 @@ export default function PdvModalBuscaProduto({ open, onClose, products, loading,
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                  <th className="pb-2 w-14 font-semibold">
+                    <span className="sr-only">Foto</span>
+                  </th>
                   <th className="pb-2 font-semibold">Cód</th>
                   <th className="pb-2 font-semibold">Nome</th>
                   <th className="pb-2 font-semibold text-right">Preço</th>
@@ -86,6 +90,9 @@ export default function PdvModalBuscaProduto({ open, onClose, products, loading,
               <tbody className="divide-y divide-gray-100">
                 {filtered.slice(0, 200).map(p => (
                   <tr key={p.id} className="hover:bg-primary-50/50">
+                    <td className="py-2 align-middle">
+                      <ProductThumb imagemUrl={p.imagemUrl} size={36} />
+                    </td>
                     <td className="py-2 font-mono text-xs text-gray-600">{p.id}</td>
                     <td className="py-2 font-medium text-gray-900">{p.name}</td>
                     <td className="py-2 text-right font-numeric tabular-nums text-primary-700 font-semibold">{fmt(p.price)}</td>

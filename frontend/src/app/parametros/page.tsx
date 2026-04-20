@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { parametrosEmpresaService, ParametroEmpresaPayload } from '@/services/parametrosEmpresaService'
-import { CompanyOption, ParametroEmpresa, Segmento } from '@/types'
+import { CompanyOption, ParametroEmpresa, Segmento, TipoEstabelecimentoFastFood } from '@/types'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
 import { appConfirm } from '@/lib/dialogs'
@@ -40,6 +40,8 @@ function segLabel(s: Segmento) {
       return 'Farmácia'
     case 'INFORMATICA':
       return 'Informática'
+    case 'FAST_FOOD':
+      return 'Fast food'
     default:
       return 'Geral'
   }
@@ -51,6 +53,8 @@ function segDesc(s: Segmento) {
       return 'Lote, validade, controlados e referências PMC.'
     case 'INFORMATICA':
       return 'Ordens de serviço e termos para assistência.'
+    case 'FAST_FOOD':
+      return 'Alimentação: totem touch, cardápio e fluxo de venda dedicado.'
     default:
       return 'Varejo e serviços sem regras específicas de segmento.'
   }
@@ -59,6 +63,15 @@ function segDesc(s: Segmento) {
 function normalizarNome(n: string) {
   return n.trim().replace(/\s+/g, ' ')
 }
+
+const TIPOS_ESTABELECIMENTO_FAST: { value: TipoEstabelecimentoFastFood; label: string }[] = [
+  { value: 'HAMBURGUERIA', label: 'Hamburgueria' },
+  { value: 'PIZZARIA', label: 'Pizzaria' },
+  { value: 'RESTAURANTE', label: 'Restaurante' },
+  { value: 'LANCHONETE', label: 'Lanchonete' },
+  { value: 'ACAI_SORVETERIA', label: 'Açaí / sorvetes' },
+  { value: 'OUTROS', label: 'Outros' },
+]
 
 function formFromParametros(p: ParametroEmpresa | null): ParametroEmpresaPayload {
   if (!p) {
@@ -72,6 +85,8 @@ function formFromParametros(p: ParametroEmpresa | null): ParametroEmpresaPayload
       farmaciaAntimicrobianosAtivo: false,
       farmaciaPmcAtivo: false,
       moduloInformaticaAtivo: false,
+      moduloFastFoodAtivo: false,
+      tipoEstabelecimentoFastFood: null,
     }
   }
   return {
@@ -95,6 +110,8 @@ function formFromParametros(p: ParametroEmpresa | null): ParametroEmpresaPayload
     farmaciaPmcAtivo: !!p.farmaciaPmcAtivo,
     farmaciaPmcModo: p.farmaciaPmcModo === 'BLOQUEIO' ? 'BLOQUEIO' : 'ALERTA',
     moduloInformaticaAtivo: !!p.moduloInformaticaAtivo,
+    moduloFastFoodAtivo: !!p.moduloFastFoodAtivo,
+    tipoEstabelecimentoFastFood: p.tipoEstabelecimentoFastFood ?? null,
     cnpj: p.cnpj ? formatCnpjDisplay(p.cnpj) : '',
     inscricaoMunicipal: p.inscricaoMunicipal ?? '',
     telefoneComercial: p.telefoneComercial ? formatPhoneBrDisplay(onlyDigits(p.telefoneComercial)) : '',
@@ -172,6 +189,8 @@ export default function ParametrosPage() {
     farmaciaAntimicrobianosAtivo: false,
     farmaciaPmcAtivo: false,
     moduloInformaticaAtivo: false,
+    moduloFastFoodAtivo: false,
+    tipoEstabelecimentoFastFood: null,
   })
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [currentCompanyId, setCurrentCompanyId] = useState<number | null>(null)
@@ -432,8 +451,10 @@ export default function ParametrosPage() {
   const farmaciaOff = !form.moduloFarmaciaAtivo
   const pmcOff = farmaciaOff || !form.farmaciaPmcAtivo
   const segmentoAtual = form.segmento ?? 'GERAL'
-  const showFarmaciaModule = segmentoAtual !== 'INFORMATICA'
-  const showInformaticaModule = segmentoAtual !== 'FARMACIA'
+  const showFarmaciaModule = segmentoAtual !== 'INFORMATICA' && segmentoAtual !== 'FAST_FOOD'
+  const showInformaticaModule = segmentoAtual !== 'FARMACIA' && segmentoAtual !== 'FAST_FOOD'
+  const showFastFoodModule = segmentoAtual !== 'FARMACIA' && segmentoAtual !== 'INFORMATICA'
+  const fastFoodOff = !form.moduloFastFoodAtivo
   const activeCompany = companies.find(c => c.id === currentCompanyId) ?? null
   /** ADM global: sempre vê lista, busca e troca de empresas, independente da empresa ativa no JWT. */
   const showEmpresasManagement = isAdm
@@ -460,9 +481,10 @@ export default function ParametrosPage() {
       { id: 'sec-segmento', label: 'Segmento' },
     )
     if (showFarmaciaModule) base.push({ id: 'sec-farmacia', label: 'Farmacia' })
+    if (showFastFoodModule) base.push({ id: 'sec-fast-food', label: 'Fast Food' })
     if (showInformaticaModule) base.push({ id: 'sec-informatica', label: 'Informatica / OS' })
     return base
-  }, [showEmpresasManagement, showFarmaciaModule, showInformaticaModule])
+  }, [showEmpresasManagement, showFarmaciaModule, showFastFoodModule, showInformaticaModule])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -916,8 +938,8 @@ export default function ParametrosPage() {
             title="Segmento"
             subtitle="Define o contexto de negócio; os módulos abaixo podem ser ligados conforme a operação."
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(['GERAL', 'FARMACIA', 'INFORMATICA'] as Segmento[]).map(s => {
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {(['GERAL', 'FARMACIA', 'FAST_FOOD', 'INFORMATICA'] as Segmento[]).map(s => {
                 const active = form.segmento === s
                 return (
                   <button
@@ -999,6 +1021,63 @@ export default function ParametrosPage() {
                   <p className="text-xs text-red-600 mt-1">{fieldErrors.farmaciaPmcModo}</p>
                 )}
               </div>
+            </div>
+          </Section>
+          )}
+
+          {showFastFoodModule && (
+          <Section
+            id="sec-fast-food"
+            icon={
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"
+                />
+              </svg>
+            }
+            title="Módulo Fast Food / Totem"
+            subtitle="Interface de venda em quiosque (perfil Totem) e tipo de estabelecimento para personalizar o fluxo."
+          >
+            <label className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!form.moduloFastFoodAtivo}
+                onChange={e => setForm({ ...form, moduloFastFoodAtivo: e.target.checked })}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+              />
+              <span className="text-sm font-medium text-gray-800">Ativar módulo Fast Food</span>
+            </label>
+            <div className={`max-w-md ${fastFoodOff ? 'opacity-45 pointer-events-none' : ''}`}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de estabelecimento</label>
+              <select
+                value={form.tipoEstabelecimentoFastFood ?? ''}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    tipoEstabelecimentoFastFood: (e.target.value || null) as TipoEstabelecimentoFastFood | null,
+                  })
+                }
+                className="input-field"
+                disabled={fastFoodOff}
+              >
+                <option value="">Selecione…</option>
+                {TIPOS_ESTABELECIMENTO_FAST.map(t => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                Usuários com perfil <strong>Totem</strong> acessam só a tela de venda em modo quiosque (
+                <code className="text-xs">/totem</code>).
+              </p>
             </div>
           </Section>
           )}

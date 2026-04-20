@@ -50,6 +50,10 @@ public class FechamentoCaixa {
     @Builder.Default
     private BigDecimal totalPix = BigDecimal.ZERO;
 
+    @Column(name = "total_voucher", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal totalVoucher = BigDecimal.ZERO;
+
     @Column(name = "total_geral", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal totalGeral = BigDecimal.ZERO;

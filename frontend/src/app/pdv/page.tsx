@@ -1,195 +1,129 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import PdvCupomThermal from '@/components/pdv/PdvCupomThermal'
 import PdvModalBuscaProduto from '@/components/pdv/PdvModalBuscaProduto'
 import PdvModalQuantidade from '@/components/pdv/PdvModalQuantidade'
 import PdvModalFechamentoCaixa from '@/components/pdv/PdvModalFechamentoCaixa'
 import PdvModalCliente from '@/components/pdv/PdvModalCliente'
-import { productService } from '@/services/productService'
-import { orderService } from '@/services/orderService'
-import { clienteService } from '@/services/clienteService'
-import { pdvTerminalService } from '@/services/pdvTerminalService'
-import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
-import { Cliente, CartItem, FormaPagamento, Order, PdvTerminal, Product } from '@/types'
-import Image from 'next/image'
+import PdvPagamentoModal from '@/components/pdv/PdvPagamentoModal'
+import { resolveApiErrorMessage, usePdvSale } from '@/hooks/usePdvSale'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
 import { appAlert, appConfirm } from '@/lib/dialogs'
 import { authService } from '@/services/authService'
-import QRCode from 'qrcode'
-import { buildPixCopiaECola, isPixKeyPlaceholder } from '@/lib/pixCopiaECola'
-import { printThermalReceipt, type ThermalReceiptExtras } from '@/lib/printThermalReceipt'
+import { printThermalReceipt } from '@/lib/printThermalReceipt'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
-const FORMAS: { value: FormaPagamento; label: string }[] = [
-  { value: 'DINHEIRO', label: 'Dinheiro' },
-  { value: 'DEBITO', label: 'Débito' },
-  { value: 'PIX', label: 'Pix' },
-  { value: 'CARTAO', label: 'Cartão' },
-]
-
-function iconFormaPagamento(f: FormaPagamento) {
-  if (f === 'DINHEIRO') return '💵'
-  if (f === 'DEBITO') return '🪪'
-  if (f === 'PIX') return '📱'
-  return '💳'
-}
-
-function resolveApiErrorMessage(err: unknown, fallback: string) {
-  const ax = err as { response?: { status?: number; data?: { error?: string } } }
-  if (ax.response?.status === 403) {
-    return ax.response.data?.error || 'Seu perfil nao possui permissao para esta operacao no PDV.'
-  }
-  return ax.response?.data?.error || fallback
-}
-
-/** Estados do caixa como no sistema-cadastro (bloqueia venda quando ≠ LIVRE) */
-type CaixaVisual = 'LIVRE' | 'PAUSADO' | 'FECHADO'
-
 export default function PdvPage() {
   const router = useRouter()
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const pedidoInputRef = useRef<HTMLInputElement>(null)
-  const cpfPagamentoRef = useRef<HTMLInputElement>(null)
-  const clienteModalInputRef = useRef<HTMLInputElement>(null)
-  const cartLenRef = useRef(0)
-  const lastPrintedOrderRef = useRef<Order | null>(null)
-  const lastPrintedExtrasRef = useRef<ThermalReceiptExtras | null>(null)
-  const uiRef = useRef({
-    showPagamentoModal: false,
-    showBuscaProduto: false,
-    showQtdModal: false,
-    showFechamentoModal: false,
-    showClienteModal: false,
-    showUltimas: false,
-  })
-  const [products, setProducts] = useState<Product[]>([])
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [finishing, setFinishing] = useState(false)
-  const [success, setSuccess] = useState(false)
-
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [lineQty, setLineQty] = useState(1)
-
-  const [forma, setForma] = useState<FormaPagamento>('DINHEIRO')
-  const [parcelas, setParcelas] = useState(1)
-  const [desconto, setDesconto] = useState('')
-  const [cpfCliente, setCpfCliente] = useState('')
-  const [chavePix, setChavePix] = useState('')
-  const [chavePixEmpresa, setChavePixEmpresa] = useState('')
-  const [pixQrDataUrl, setPixQrDataUrl] = useState<string | null>(null)
-  const [pixPayload, setPixPayload] = useState<string | null>(null)
-  const [pixQrError, setPixQrError] = useState<string | null>(null)
-  const [clienteId, setClienteId] = useState<number | undefined>(undefined)
-  const [clienteBusca, setClienteBusca] = useState('')
-  const [clientesOpts, setClientesOpts] = useState<Cliente[]>([])
-  const [terminais, setTerminais] = useState<PdvTerminal[]>([])
-  const [terminalId, setTerminalId] = useState<number | ''>('')
-  const [farmacia, setFarmacia] = useState(false)
-  const [showFarmLines, setShowFarmLines] = useState(false)
-  const [ultimas, setUltimas] = useState<Order[]>([])
-  const [showUltimas, setShowUltimas] = useState(false)
-  const [nomeEmpresa, setNomeEmpresa] = useState('Veltrix')
-  const [logoEmpresaUrl, setLogoEmpresaUrl] = useState('')
-  const [logoFalhou, setLogoFalhou] = useState(false)
-  const [pedidoCodigo, setPedidoCodigo] = useState('')
-  const [caixaStatus, setCaixaStatus] = useState<CaixaVisual>('LIVRE')
-  const [showPagamentoModal, setShowPagamentoModal] = useState(false)
-  const [showBuscaProduto, setShowBuscaProduto] = useState(false)
-  const [showQtdModal, setShowQtdModal] = useState(false)
-  const [showFechamentoModal, setShowFechamentoModal] = useState(false)
-  const [showClienteModal, setShowClienteModal] = useState(false)
-
-  const [authUser, setAuthUser] = useState<ReturnType<typeof getAuth>>(null)
-  const isVendedor = authUser?.role === 'VENDEDOR'
+  const {
+    searchInputRef,
+    pedidoInputRef,
+    cpfPagamentoRef,
+    clienteModalInputRef,
+    cartLenRef,
+    lastPrintedOrderRef,
+    lastPrintedExtrasRef,
+    uiRef,
+    products,
+    cart,
+    search,
+    setSearch,
+    loading,
+    setLoading,
+    finishing,
+    success,
+    selectedProduct,
+    setSelectedProduct,
+    lineQty,
+    setLineQty,
+    forma,
+    setForma,
+    parcelas,
+    setParcelas,
+    desconto,
+    setDesconto,
+    cpfCliente,
+    setCpfCliente,
+    chavePix,
+    setChavePix,
+    chavePixEmpresa,
+    pixQrDataUrl,
+    pixPayload,
+    pixQrError,
+    clienteId,
+    setClienteId,
+    clienteBusca,
+    setClienteBusca,
+    clientesOpts,
+    setClientesOpts,
+    terminalId,
+    farmacia,
+    fastFood,
+    showFarmLines,
+    setShowFarmLines,
+    ultimas,
+    showUltimas,
+    setShowUltimas,
+    nomeEmpresa,
+    logoEmpresaUrl,
+    logoFalhou,
+    setLogoFalhou,
+    pedidoCodigo,
+    setPedidoCodigo,
+    caixaStatus,
+    showPagamentoModal,
+    setShowPagamentoModal,
+    showBuscaProduto,
+    setShowBuscaProduto,
+    showQtdModal,
+    setShowQtdModal,
+    showFechamentoModal,
+    setShowFechamentoModal,
+    showClienteModal,
+    setShowClienteModal,
+    authUser,
+    subtotalCart,
+    descontoNum,
+    total,
+    totalLinhaPreview,
+    terminalCodigo,
+    initialQtdModal,
+    heroName,
+    loadBasics,
+    cycleCaixaStatus,
+    novaVenda,
+    limparCarrinho,
+    addToCart,
+    updateQty,
+    setCartLote,
+    finalize,
+    applyQuantidadeInformada,
+    buscarClientes,
+    handleClienteCreate,
+    openUltimas,
+  } = usePdvSale()
 
   useEffect(() => {
-    const syncAuth = () => setAuthUser(getAuth())
-    syncAuth()
-    window.addEventListener('veltrix-auth-changed', syncAuth)
-    return () => window.removeEventListener('veltrix-auth-changed', syncAuth)
-  }, [])
+    const r = getAuth()?.role
+    if (r === 'TOTEM') {
+      router.replace('/totem')
+    }
+  }, [router])
 
   function sairDoPdv() {
     const roleAtual = getAuth()?.role
-    if (roleAtual === 'VENDEDOR') {
+    if (roleAtual === 'VENDEDOR' || roleAtual === 'TOTEM') {
       const redirectPath = authService.logout()
       router.replace(redirectPath)
       return
     }
     router.push('/dashboard')
   }
-
-  useEffect(() => {
-    uiRef.current = {
-      showPagamentoModal,
-      showBuscaProduto,
-      showQtdModal,
-      showFechamentoModal,
-      showClienteModal,
-      showUltimas,
-    }
-  }, [showPagamentoModal, showBuscaProduto, showQtdModal, showFechamentoModal, showClienteModal, showUltimas])
-
-  useEffect(() => {
-    cartLenRef.current = cart.length
-  }, [cart.length])
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return []
-    return products.filter(p => p.name.toLowerCase().includes(query))
-  }, [products, search])
-
-  useEffect(() => {
-    if (filtered.length === 0) {
-      setSelectedProduct(null)
-      return
-    }
-    const q = search.trim()
-    if (q === '') {
-      setSelectedProduct(prev => {
-        if (prev && filtered.some(p => p.id === prev.id)) return prev
-        return null
-      })
-      return
-    }
-    setSelectedProduct(prev => {
-      if (prev && filtered.some(p => p.id === prev.id)) return prev
-      return filtered[0]
-    })
-  }, [filtered, search])
-
-  const loadBasics = useCallback(async () => {
-    const [prods, term, par] = await Promise.all([
-      productService.getAll(),
-      pdvTerminalService.getAll().catch(() => [] as PdvTerminal[]),
-      parametrosEmpresaService.get().catch(() => null),
-    ])
-    setProducts(prods)
-    setTerminais(term.filter(t => t.ativo))
-    if (par?.chavePix) {
-      setChavePixEmpresa(par.chavePix)
-      setChavePix(par.chavePix)
-    } else {
-      setChavePixEmpresa('')
-    }
-    setFarmacia(!!par?.moduloFarmaciaAtivo)
-    if (par?.nomeEmpresa?.trim()) setNomeEmpresa(par.nomeEmpresa.trim())
-    if (par?.logoUrl?.trim()) {
-      setLogoEmpresaUrl(par.logoUrl.trim())
-      setLogoFalhou(false)
-    } else {
-      setLogoEmpresaUrl('')
-      setLogoFalhou(false)
-    }
-  }, [])
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -206,251 +140,6 @@ export default function PdvPage() {
       }
     })()
   }, [router, loadBasics])
-
-  useEffect(() => {
-    if (!terminalId) return
-    pdvTerminalService.heartbeat(terminalId, caixaStatus).catch(() => {})
-    const t = window.setInterval(() => {
-      pdvTerminalService.heartbeat(terminalId, caixaStatus).catch(() => {})
-    }, 25000)
-    return () => window.clearInterval(t)
-  }, [terminalId, caixaStatus])
-
-  useEffect(() => {
-    if (!terminais.length) return
-    const preferredId = authUser?.pdvTerminalId ?? null
-    if (preferredId && terminais.some(t => t.id === preferredId)) {
-      setTerminalId(preferredId)
-      return
-    }
-    if (terminalId === '') {
-      setTerminalId(terminais[0].id)
-    }
-  }, [terminais, authUser?.pdvTerminalId, terminalId])
-
-  async function openUltimas() {
-    try {
-      const all = await orderService.getAll()
-      setUltimas(all.slice(0, 15))
-      setShowUltimas(true)
-    } catch (err: unknown) {
-      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel carregar as ultimas vendas.'), 'Ultimas vendas')
-    }
-  }
-
-  async function buscarClientes() {
-    const q = clienteBusca.trim()
-    if (!q) {
-      setClientesOpts([])
-      return
-    }
-    try {
-      setClientesOpts(await clienteService.getAll(q))
-    } catch (err: unknown) {
-      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel buscar clientes.'), 'Clientes')
-    }
-  }
-
-  const subtotalCart = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
-  const descontoNum = Math.max(0, Number(desconto) || 0)
-  const total = Math.max(0, subtotalCart - descontoNum)
-
-  useEffect(() => {
-    if (!showPagamentoModal || forma !== 'PIX') return
-    let cancelled = false
-    parametrosEmpresaService
-      .get()
-      .then(p => {
-        if (cancelled || !p?.chavePix?.trim()) return
-        setChavePixEmpresa(p.chavePix.trim())
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [showPagamentoModal, forma])
-
-  useEffect(() => {
-    if (!showPagamentoModal || forma !== 'PIX') {
-      setPixQrDataUrl(null)
-      setPixPayload(null)
-      setPixQrError(null)
-      return
-    }
-    const keyEfetiva = (chavePix.trim() || chavePixEmpresa).trim()
-    if (total <= 0) {
-      setPixQrDataUrl(null)
-      setPixPayload(null)
-      setPixQrError('Valor inválido para gerar o QR Code.')
-      return
-    }
-    if (isPixKeyPlaceholder(keyEfetiva)) {
-      setPixQrDataUrl(null)
-      setPixPayload(null)
-      setPixQrError('Configure a Chave PIX em Parâmetros para gerar o QR Code.')
-      return
-    }
-    setPixQrError(null)
-    let cancelled = false
-    try {
-      const payload = buildPixCopiaECola({
-        amount: total,
-        pixKey: keyEfetiva,
-        merchantName: nomeEmpresa || 'Sua Loja',
-      })
-      void QRCode.toDataURL(payload, { width: 200, margin: 1, errorCorrectionLevel: 'M' }).then(url => {
-        if (!cancelled) {
-          setPixPayload(payload)
-          setPixQrDataUrl(url)
-        }
-      })
-    } catch {
-      setPixQrDataUrl(null)
-      setPixPayload(null)
-      setPixQrError('Erro ao gerar QR Code.')
-    }
-    return () => {
-      cancelled = true
-    }
-  }, [showPagamentoModal, forma, total, chavePix, chavePixEmpresa, nomeEmpresa])
-
-  const unit = selectedProduct?.price ?? 0
-  const totalLinhaPreview = unit * Math.max(1, lineQty)
-
-  const terminalCodigo = terminalId === ''
-    ? (authUser?.pdvTerminalCodigo ?? '—')
-    : terminais.find(t => t.id === terminalId)?.codigo ?? String(terminalId)
-
-  function cycleCaixaStatus() {
-    setCaixaStatus(s => (s === 'LIVRE' ? 'PAUSADO' : s === 'PAUSADO' ? 'FECHADO' : 'LIVRE'))
-  }
-
-  /** Limpa carrinho, busca, cliente, linha de item e produto em destaque (como novaVenda no sistema-cadastro). */
-  function limparEstadoVenda() {
-    setCart([])
-    setSearch('')
-    setDesconto('')
-    setClienteId(undefined)
-    setClienteBusca('')
-    setClientesOpts([])
-    setLineQty(1)
-    setPedidoCodigo('')
-    setCpfCliente('')
-    setSelectedProduct(null)
-    setShowPagamentoModal(false)
-  }
-
-  function novaVenda() {
-    limparEstadoVenda()
-    setSuccess(false)
-  }
-
-  function limparCarrinho() {
-    setCart([])
-    setSearch('')
-    setSelectedProduct(null)
-    setLineQty(0)
-  }
-
-  function addToCart(product: Product, qty: number = 1) {
-    if (caixaStatus !== 'LIVRE') {
-      void appAlert(`Caixa ${caixaStatus}. Operação não permitida.`, 'Caixa indisponível')
-      return
-    }
-    const q = Math.max(1, Math.floor(qty))
-    setCart(prev => {
-      const existing = prev.find(i => i.product.id === product.id)
-      if (existing) {
-        return prev.map(i => (i.product.id === product.id ? { ...i, quantity: i.quantity + q } : i))
-      }
-      return [...prev, { product, quantity: q }]
-    })
-    setLineQty(1)
-  }
-
-  function updateQty(productId: number, qty: number) {
-    if (qty <= 0) {
-      setCart(prev => prev.filter(i => i.product.id !== productId))
-    } else {
-      setCart(prev => prev.map(i => (i.product.id === productId ? { ...i, quantity: qty } : i)))
-    }
-  }
-
-  function setCartLote(productId: number, field: 'loteCodigo' | 'loteValidade', value: string) {
-    setCart(prev =>
-      prev.map(i => (i.product.id === productId ? { ...i, [field]: value || undefined } : i))
-    )
-  }
-
-  async function finalize() {
-    if (cart.length === 0) return
-    setFinishing(true)
-    try {
-      const order = await orderService.create({
-        items: cart.map(i => ({
-          productId: i.product.id,
-          quantity: i.quantity,
-          loteCodigo: i.loteCodigo,
-          loteValidade: i.loteValidade,
-        })),
-        formaPagamento: forma,
-        parcelas: forma === 'CARTAO' ? parcelas : 1,
-        chavePix: forma === 'PIX' ? (chavePix.trim() || chavePixEmpresa || undefined) : undefined,
-        cpfCliente: cpfCliente || undefined,
-        clienteId,
-        desconto: descontoNum > 0 ? descontoNum : undefined,
-        terminalId: terminalId === '' ? undefined : terminalId,
-      })
-      const extras: ThermalReceiptExtras = {
-        nomeEmpresa,
-        clienteNome: clienteId ? clienteBusca : undefined,
-        terminalCodigo:
-          terminalId === ''
-            ? undefined
-            : (terminais.find(t => t.id === terminalId)?.codigo ?? String(terminalId)),
-      }
-      lastPrintedOrderRef.current = order
-      lastPrintedExtrasRef.current = extras
-      printThermalReceipt(order, extras)
-      limparEstadoVenda()
-      setSuccess(true)
-      window.setTimeout(() => searchInputRef.current?.focus(), 0)
-      setTimeout(() => setSuccess(false), 4000)
-      await loadBasics()
-    } catch (err: unknown) {
-      const ax = err as { response?: { data?: { error?: string } } }
-      await appAlert(ax.response?.data?.error || 'Erro ao finalizar venda.', 'Falha na finalização')
-    } finally {
-      setFinishing(false)
-    }
-  }
-
-  function applyQuantidadeInformada(n: number) {
-    const qty = Math.max(1, Math.floor(n))
-    if (selectedProduct && cart.some(i => i.product.id === selectedProduct.id)) {
-      updateQty(selectedProduct.id, qty)
-    } else {
-      setLineQty(qty)
-    }
-  }
-
-  async function handleClienteCreate(payload: {
-    nome: string
-    email: string
-    telefone: string
-    cpf: string
-    endereco: string
-  }) {
-    try {
-      const c = await clienteService.create(payload)
-      setClienteId(c.id)
-      setClienteBusca(c.nome)
-      setClientesOpts([])
-    } catch (err: unknown) {
-      await appAlert(resolveApiErrorMessage(err, 'Nao foi possivel cadastrar cliente no PDV.'), 'Clientes')
-      throw err
-    }
-  }
 
   useEffect(() => {
     async function onKey(e: KeyboardEvent) {
@@ -485,7 +174,7 @@ export default function PdvPage() {
           setShowUltimas(false)
           return
         }
-        if (getAuth()?.role === 'VENDEDOR') {
+        if (getAuth()?.role === 'VENDEDOR' || getAuth()?.role === 'TOTEM') {
           sairDoPdv()
           return
         }
@@ -579,15 +268,6 @@ export default function PdvPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- atalhos PDV
   }, [router, caixaStatus])
 
-  const initialQtdModal = useMemo(() => {
-    if (selectedProduct) {
-      const inCart = cart.find(i => i.product.id === selectedProduct.id)
-      if (inCart) return inCart.quantity
-    }
-    return lineQty
-  }, [selectedProduct, cart, lineQty])
-
-  const heroName = selectedProduct?.name ?? (search.trim() ? 'Nenhum resultado' : 'Aguardando produto')
   const empresaSigla = nomeEmpresa
     .split(' ')
     .slice(0, 2)
@@ -1010,240 +690,44 @@ export default function PdvPage() {
         </footer>
       </div>
 
-      {showPagamentoModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 backdrop-blur-[2px] p-3 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pdv-modal-pagamento-titulo"
-          onClick={() => setShowPagamentoModal(false)}
-        >
-          <div
-            className="w-full max-w-3xl max-h-[min(92dvh,880px)] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200/80 flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-3 sm:px-5">
-              <h2 id="pdv-modal-pagamento-titulo" className="text-base sm:text-lg font-bold text-gray-900">
-                Finalizar venda
-                <span className="ml-2 text-xs font-semibold text-gray-400">(F10)</span>
-              </h2>
-              <button
-                type="button"
-                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 text-xl leading-none"
-                onClick={() => setShowPagamentoModal(false)}
-                aria-label="Fechar"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-              <div className="grid gap-5 p-4 sm:p-6 md:grid-cols-2 md:gap-8">
-                <div className="space-y-4 min-w-0">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Formas de pagamento</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {FORMAS.map(f => (
-                      <button
-                        key={f.value}
-                        type="button"
-                        onClick={() => setForma(f.value)}
-                        className={[
-                          'flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition-all min-h-[48px]',
-                          forma === f.value
-                            ? 'border-primary-500 bg-primary-50 text-primary-900 shadow-md shadow-primary-600/10 ring-2 ring-primary-500/25'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50/80',
-                        ].join(' ')}
-                      >
-                        <span className="text-lg" aria-hidden>
-                          {iconFormaPagamento(f.value)}
-                        </span>
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {forma === 'CARTAO' && (
-                    <div>
-                      <label className={labelClass}>Parcelas</label>
-                      <select
-                        value={parcelas}
-                        onChange={e => setParcelas(Number(e.target.value))}
-                        className={fieldClass}
-                      >
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                          <option key={n} value={n}>
-                            {n}x de {fmt(total / n)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {forma === 'PIX' && (
-                    <div>
-                      <label className={labelClass}>Chave Pix (opcional)</label>
-                      <input
-                        value={chavePix}
-                        onChange={e => setChavePix(e.target.value)}
-                        className={fieldClass}
-                        placeholder="Parâmetros da empresa se vazio"
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className={labelClass}>Desconto (R$)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={desconto}
-                        onChange={e => setDesconto(e.target.value)}
-                        className={fieldClass}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>CPF na nota (opcional)</label>
-                      <input
-                        ref={cpfPagamentoRef}
-                        value={cpfCliente}
-                        onChange={e => setCpfCliente(e.target.value)}
-                        className={fieldClass}
-                        placeholder="000.000.000-00"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={labelClass} htmlFor="pdv-cliente-busca-modal">
-                      Cliente
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        ref={clienteModalInputRef}
-                        id="pdv-cliente-busca-modal"
-                        value={clienteBusca}
-                        onChange={e => setClienteBusca(e.target.value)}
-                        className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 min-h-[44px]"
-                        placeholder="Nome, e-mail ou telefone"
-                        autoComplete="off"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void buscarClientes()}
-                        className="shrink-0 rounded-xl border border-gray-200 bg-gray-100 px-3 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-200 min-h-[44px]"
-                      >
-                        Buscar
-                      </button>
-                    </div>
-                    {clientesOpts.length > 0 && (
-                      <div className="mt-2 max-h-36 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100 bg-white shadow-sm">
-                        {clientesOpts.map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setClienteId(c.id)
-                              setClienteBusca(c.nome)
-                              setClientesOpts([])
-                            }}
-                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary-50 transition-colors"
-                          >
-                            {c.nome}{' '}
-                            <span className="text-gray-400 text-xs">{c.telefone || c.email || ''}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {farmacia && (
-                    <button
-                      type="button"
-                      onClick={() => setShowFarmLines(!showFarmLines)}
-                      className="text-sm font-medium text-amber-800 hover:underline"
-                    >
-                      {showFarmLines ? '▼' : '▶'} Lote / validade por item no cupom
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-col rounded-2xl border border-gray-200/90 bg-gradient-to-b from-gray-50/90 to-white p-4 sm:p-5 shadow-inner min-h-0">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Resumo da venda</h3>
-                  <div className="space-y-2.5 flex-1 text-sm">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Subtotal</span>
-                      <span className="font-numeric tabular-nums font-medium text-gray-900">{fmt(subtotalCart)}</span>
-                    </div>
-                    {descontoNum > 0 && (
-                      <div className="flex justify-between text-amber-800">
-                        <span>Desconto</span>
-                        <span className="font-numeric tabular-nums font-semibold">− {fmt(descontoNum)}</span>
-                      </div>
-                    )}
-                    <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-                    <div className="flex justify-between items-baseline gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Total a pagar</span>
-                      <span className="text-2xl sm:text-3xl font-bold font-numeric tabular-nums text-primary-700">
-                        {fmt(total)}
-                      </span>
-                    </div>
-                    {forma === 'PIX' && (
-                      <div className="mt-4 rounded-xl border border-gray-200/90 bg-white/80 p-3 text-center">
-                        {pixQrError && <p className="text-sm text-amber-900 mb-2">{pixQrError}</p>}
-                        {pixQrDataUrl && !pixQrError && (
-                          <>
-                            <Image
-                              src={pixQrDataUrl}
-                              alt="QR Code para pagamento PIX"
-                              width={200}
-                              height={200}
-                              unoptimized
-                              className="mx-auto rounded-lg"
-                            />
-                            {pixPayload && (
-                              <button
-                                type="button"
-                                className="mt-3 w-full rounded-lg border border-primary-200 bg-primary-50 py-2 text-sm font-semibold text-primary-900 hover:bg-primary-100"
-                                onClick={() =>
-                                  void navigator.clipboard.writeText(pixPayload).then(() =>
-                                    appAlert('Código PIX copiado para a área de transferência.', 'PIX')
-                                  )
-                                }
-                              >
-                                Copiar código PIX (copia e cola)
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-5 space-y-2 pt-2 border-t border-gray-200/80">
-                    <button
-                      type="button"
-                      onClick={() => void finalize()}
-                      disabled={finishing || cart.length === 0}
-                      className="btn-primary w-full py-3.5 min-h-[52px] rounded-xl text-base font-bold shadow-lg shadow-primary-600/20"
-                    >
-                      {finishing ? 'Confirmando…' : 'Confirmar pagamento'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPagamentoModal(false)}
-                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      Voltar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PdvPagamentoModal
+        open={showPagamentoModal}
+        onClose={() => setShowPagamentoModal(false)}
+        forma={forma}
+        setForma={setForma}
+        parcelas={parcelas}
+        setParcelas={setParcelas}
+        chavePix={chavePix}
+        setChavePix={setChavePix}
+        desconto={desconto}
+        setDesconto={setDesconto}
+        cpfCliente={cpfCliente}
+        setCpfCliente={setCpfCliente}
+        clienteBusca={clienteBusca}
+        setClienteBusca={setClienteBusca}
+        clientesOpts={clientesOpts}
+        onBuscarClientes={() => void buscarClientes()}
+        onSelectCliente={c => {
+          setClienteId(c.id)
+          setClienteBusca(c.nome)
+          setClientesOpts([])
+        }}
+        farmacia={farmacia}
+        fastFood={fastFood}
+        showFarmLines={showFarmLines}
+        setShowFarmLines={setShowFarmLines}
+        subtotalCart={subtotalCart}
+        descontoNum={descontoNum}
+        total={total}
+        pixQrDataUrl={pixQrDataUrl}
+        pixQrError={pixQrError}
+        pixPayload={pixPayload}
+        finishing={finishing}
+        cartLength={cart.length}
+        onFinalize={() => void finalize()}
+        cpfPagamentoRef={cpfPagamentoRef}
+        clienteModalInputRef={clienteModalInputRef}
+      />
 
       {showUltimas && (
         <div

@@ -48,6 +48,17 @@
     font-feature-settings: 'tnum' 1, 'lnum' 1;
     letter-spacing: -0.02em;
   }
+
+  /** Totem / touch: esconde barras; o usuário ainda rola com o dedo. */
+  .scrollbar-touch-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-touch-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 @layer components {

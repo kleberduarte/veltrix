@@ -6,5 +6,7 @@ public enum Role {
     /** Adm Empresa — gestão do tenant; não pode acessar empresa reservada (Default). */
     ADMIN_EMPRESA,
     /** Vendedor — PDV e rotinas relacionadas (vendas, caixa, terminais, clientes). */
-    VENDEDOR
+    VENDEDOR,
+    /** Totem — apenas interface de venda em quiosque (fluxo PDV dedicado). */
+    TOTEM
 }

@@ -14,7 +14,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Restringe o perfil {@link Role#VENDEDOR} a rotinas de PDV e vendas (não cadastra produtos, relatórios, OS, etc.).
+ * Restringe os perfis {@link Role#VENDEDOR} e {@link Role#TOTEM} a rotinas de PDV e vendas
+ * (não cadastra produtos, relatórios, OS, etc.). Totem fica no mesmo conjunto de APIs permitidas.
  */
 @Component
 @RequiredArgsConstructor
@@ -36,22 +37,22 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
                 .findFirst()
                 .orElse(null);
 
-        if (!Role.VENDEDOR.name().equals(role)) {
+        if (!Role.VENDEDOR.name().equals(role) && !Role.TOTEM.name().equals(role)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (isDeniedForVendedor(request)) {
+        if (isDeniedForVendedorOrTotem(request)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"status\":403,\"error\":\"Acesso negado para o perfil vendedor.\"}");
+            response.getWriter().write("{\"status\":403,\"error\":\"Acesso negado para este perfil.\"}");
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private boolean isDeniedForVendedor(HttpServletRequest req) {
+    private boolean isDeniedForVendedorOrTotem(HttpServletRequest req) {
         String path = servletPath(req);
         String m = req.getMethod();
         if (path.startsWith("/reports")) return true;
@@ -60,6 +61,7 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         if (path.startsWith("/ordens-servico")) return true;
         if ("POST".equals(m) && "/parametros-empresa".equals(path)) return true;
         if ("POST".equals(m) && "/products".equals(path)) return true;
+        if ("POST".equals(m) && "/products/imagem".equals(path)) return true;
         if (("PUT".equals(m) || "DELETE".equals(m)) && path.startsWith("/products")) return true;
         return false;
     }

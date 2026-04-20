@@ -1,5 +1,5 @@
 import api from '@/lib/api'
-import { ParametroEmpresa, Segmento } from '@/types'
+import { ParametroEmpresa, Segmento, TipoEstabelecimentoFastFood } from '@/types'
 
 export type ParametroEmpresaPayload = {
   nomeEmpresa?: string
@@ -22,6 +22,8 @@ export type ParametroEmpresaPayload = {
   farmaciaPmcAtivo?: boolean
   farmaciaPmcModo?: string
   moduloInformaticaAtivo?: boolean
+  moduloFastFoodAtivo?: boolean
+  tipoEstabelecimentoFastFood?: TipoEstabelecimentoFastFood | null
   cnpj?: string
   inscricaoMunicipal?: string
   telefoneComercial?: string

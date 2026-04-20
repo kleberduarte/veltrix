@@ -9,6 +9,7 @@ export type ProductPayload = {
   gtinEan?: string
   descricao?: string
   categoria?: string
+  imagemUrl?: string
   estoqueMinimo?: number
   tipo?: TipoProduto
   tipoControle?: TipoControle
@@ -41,5 +42,13 @@ export const productService = {
 
   async removeAll(): Promise<void> {
     await api.delete('/products')
+  },
+
+  /** Envia imagem (JPEG/PNG/WebP/GIF até 3 MB); retorna URL absoluta para preencher imagemUrl. */
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post<{ url: string }>('/products/imagem', form)
+    return data
   },
 }

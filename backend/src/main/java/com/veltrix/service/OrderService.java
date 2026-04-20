@@ -29,6 +29,7 @@ public class OrderService {
     private final ProductService productService;
     private final UserRepository userRepository;
     private final PdvTerminalService pdvTerminalService;
+    private final ParametroEmpresaRepository parametroEmpresaRepository;
 
     public List<OrderResponse> findAll() {
         return orderRepository.findByCompanyIdOrderByCreatedAtDesc(TenantContext.getCompanyId())
@@ -57,6 +58,15 @@ public class OrderService {
         PdvTerminal terminal = pdvTerminalService.resolveTerminalForPdv(current, companyId, request.getTerminalId());
 
         FormaPagamento fp = request.getFormaPagamento() != null ? request.getFormaPagamento() : FormaPagamento.DINHEIRO;
+        if (fp == FormaPagamento.VOUCHER) {
+            boolean fastFoodOk = parametroEmpresaRepository.findByCompanyId(companyId)
+                    .map(pe -> Boolean.TRUE.equals(pe.getModuloFastFoodAtivo()))
+                    .orElse(false);
+            if (!fastFoodOk) {
+                throw new IllegalArgumentException(
+                        "Pagamento por vale refeição (voucher) só é permitido para empresas com módulo Fast Food ativo.");
+            }
+        }
         int parcelasVal = request.getParcelas() != null ? request.getParcelas() : 1;
         if (fp != FormaPagamento.CARTAO) {
             parcelasVal = 1;

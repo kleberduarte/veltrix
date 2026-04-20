@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
+import { defaultHomePath } from '@/lib/roleAccess'
 
 export type LoginBrand = {
   nomeEmpresa: string
@@ -137,7 +138,7 @@ export default function LoginRegisterExperience({
           router.push('/primeiro-acesso')
           return
         }
-        router.push(data.role === 'VENDEDOR' ? '/pdv' : '/dashboard')
+        router.push(defaultHomePath(data.role))
         return
       }
 
@@ -168,7 +169,7 @@ export default function LoginRegisterExperience({
         router.push('/primeiro-acesso')
         return
       }
-      router.push(data.role === 'VENDEDOR' ? '/pdv' : '/dashboard')
+      router.push(defaultHomePath(data.role))
     } catch (err: unknown) {
       const ax = err as { response?: { status?: number; data?: { error?: string } } }
       const msg = ax.response?.data?.error

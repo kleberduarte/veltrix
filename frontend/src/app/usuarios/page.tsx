@@ -12,11 +12,12 @@ import { authService } from '@/services/authService'
 import { AppUser, CompanyOption, Role } from '@/types'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
-import { ROLE_LABELS } from '@/lib/roleAccess'
+import { ROLE_LABELS, defaultHomePath } from '@/lib/roleAccess'
 import { appAlert } from '@/lib/dialogs'
 
 const baseRoles: { value: Role; label: string }[] = [
   { value: 'VENDEDOR', label: ROLE_LABELS.VENDEDOR },
+  { value: 'TOTEM', label: ROLE_LABELS.TOTEM },
   { value: 'ADMIN_EMPRESA', label: ROLE_LABELS.ADMIN_EMPRESA },
   { value: 'ADM', label: ROLE_LABELS.ADM },
 ]
@@ -28,7 +29,9 @@ function roleBadge(role: Role) {
       ? 'bg-violet-100 text-violet-900 border-violet-200'
       : role === 'ADMIN_EMPRESA'
         ? 'bg-sky-100 text-sky-900 border-sky-200'
-        : 'bg-emerald-100 text-emerald-900 border-emerald-200'
+        : role === 'TOTEM'
+          ? 'bg-amber-100 text-amber-950 border-amber-200'
+          : 'bg-emerald-100 text-emerald-900 border-emerald-200'
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
   )
@@ -129,8 +132,9 @@ export default function UsuariosPage() {
       router.push('/login')
       return
     }
-    if (getAuth()?.role === 'VENDEDOR') {
-      router.replace('/pdv')
+    const r = getAuth()?.role
+    if (r === 'VENDEDOR' || r === 'TOTEM') {
+      router.replace(defaultHomePath(r))
       return
     }
     void load()
@@ -194,7 +198,7 @@ export default function UsuariosPage() {
         role: createForm.role,
         telefone: createForm.telefone?.trim() || undefined,
         mustChangePassword:
-          createForm.role === 'VENDEDOR'
+          createForm.role === 'VENDEDOR' || createForm.role === 'TOTEM'
             ? gerarSenhaAuto
             : (gerarSenhaAuto ? true : createForm.mustChangePassword),
         companyId: isAdm ? createForm.companyId : undefined,
@@ -683,7 +687,7 @@ export default function UsuariosPage() {
                     />
                   </div>
                 )}
-                {!gerarSenhaAuto && createForm.role !== 'VENDEDOR' && (
+                {!gerarSenhaAuto && createForm.role !== 'VENDEDOR' && createForm.role !== 'TOTEM' && (
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
                       type="checkbox"

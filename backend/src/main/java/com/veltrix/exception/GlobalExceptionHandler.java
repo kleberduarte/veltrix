@@ -76,7 +76,7 @@ public class GlobalExceptionHandler {
         String root = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
         if (root != null && (root.contains("FormaPagamento") || root.contains("formaPagamento"))) {
             return error(HttpStatus.BAD_REQUEST,
-                    "Forma de pagamento inválida. Valores aceitos: DINHEIRO, DEBITO, CARTAO, PIX.");
+                    "Forma de pagamento inválida. Valores aceitos: DINHEIRO, DEBITO, CARTAO, PIX, VOUCHER.");
         }
         return error(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido ou incompleto.");
     }

@@ -10,6 +10,7 @@ backend/target/
 # Next.js
 frontend/.next/
 frontend/out/
+frontend/tsconfig.tsbuildinfo
 
 # Environment — nunca versionar arquivos de segredos
 .env

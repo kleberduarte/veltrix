@@ -12,6 +12,7 @@ public class ResumoDiaResponse {
     private BigDecimal totalCartao;
     private BigDecimal totalDebito;
     private BigDecimal totalPix;
+    private BigDecimal totalVoucher;
     private BigDecimal totalGeral;
     private boolean jaFechado;
 }

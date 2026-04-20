@@ -4,5 +4,7 @@ public enum FormaPagamento {
     DINHEIRO,
     DEBITO,
     CARTAO,
-    PIX
+    PIX,
+    /** Vale refeição / voucher (PDV Fast Food). */
+    VOUCHER
 }

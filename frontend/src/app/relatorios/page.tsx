@@ -6,6 +6,7 @@ import { orderService } from '@/services/orderService'
 import { DailyReport, Order } from '@/types'
 import { useRouter } from 'next/navigation'
 import { getAuth, isAuthenticated } from '@/lib/auth'
+import { defaultHomePath } from '@/lib/roleAccess'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -28,7 +29,11 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
-    if (getAuth()?.role === 'VENDEDOR') { router.replace('/pdv'); return }
+    const r = getAuth()?.role
+    if (r === 'VENDEDOR' || r === 'TOTEM') {
+      router.replace(defaultHomePath(r))
+      return
+    }
     let cancelled = false
     ;(async () => {
       setLoading(true)
@@ -44,7 +49,7 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) return
-    if (getAuth()?.role === 'VENDEDOR') return
+    if (getAuth()?.role === 'VENDEDOR' || getAuth()?.role === 'TOTEM') return
     let cancelled = false
     ;(async () => {
       setLoadingPeriod(true)

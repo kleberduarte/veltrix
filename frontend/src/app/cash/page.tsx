@@ -112,7 +112,7 @@ export default function CashPage() {
             <p className="text-gray-400">Carregando resumo...</p>
           ) : resumo ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="rounded-lg bg-gray-50 p-3">
                   <p className="text-xs text-gray-500">Vendas</p>
                   <p className="text-xl font-bold text-gray-900">{resumo.quantidadeVendas}</p>
@@ -132,6 +132,10 @@ export default function CashPage() {
                 <div className="rounded-lg bg-violet-50 p-3">
                   <p className="text-xs text-violet-800">Pix</p>
                   <p className="text-xl font-bold text-violet-800">{fmt(resumo.totalPix)}</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-3">
+                  <p className="text-xs text-amber-900">Vale refeição</p>
+                  <p className="text-xl font-bold text-amber-900">{fmt(resumo.totalVoucher ?? 0)}</p>
                 </div>
               </div>
               <p className="text-sm">

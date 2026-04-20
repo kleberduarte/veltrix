@@ -253,6 +253,12 @@ public class ParametroEmpresaService {
         if (request.getModuloInformaticaAtivo() != null) {
             pe.setModuloInformaticaAtivo(request.getModuloInformaticaAtivo());
         }
+        if (request.getModuloFastFoodAtivo() != null) {
+            pe.setModuloFastFoodAtivo(request.getModuloFastFoodAtivo());
+        }
+        if (request.getTipoEstabelecimentoFastFood() != null) {
+            pe.setTipoEstabelecimentoFastFood(request.getTipoEstabelecimentoFastFood());
+        }
         if (request.getCnpj() != null) {
             String c = CnpjValidator.apenasDigitos(request.getCnpj());
             pe.setCnpj(c.isEmpty() ? null : c);
@@ -302,7 +308,10 @@ public class ParametroEmpresaService {
         r.setFarmaciaControladosAtivo(pe.getFarmaciaControladosAtivo());
         r.setFarmaciaAntimicrobianosAtivo(pe.getFarmaciaAntimicrobianosAtivo());
         r.setFarmaciaPmcAtivo(pe.getFarmaciaPmcAtivo()); r.setFarmaciaPmcModo(pe.getFarmaciaPmcModo());
-        r.setModuloInformaticaAtivo(pe.getModuloInformaticaAtivo()); r.setCnpj(pe.getCnpj());
+        r.setModuloInformaticaAtivo(pe.getModuloInformaticaAtivo());
+        r.setModuloFastFoodAtivo(pe.getModuloFastFoodAtivo());
+        r.setTipoEstabelecimentoFastFood(pe.getTipoEstabelecimentoFastFood());
+        r.setCnpj(pe.getCnpj());
         r.setTelefoneComercial(pe.getTelefoneComercial()); r.setEmailComercial(pe.getEmailComercial());
         r.setEnderecoLinha1Os(pe.getEnderecoLinha1Os()); r.setCidadeUfOs(pe.getCidadeUfOs());
         r.setInscricaoMunicipal(pe.getInscricaoMunicipal()); r.setFax(pe.getFax());

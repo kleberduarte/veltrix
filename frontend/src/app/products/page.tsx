@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
+import ProductThumb from '@/components/product/ProductThumb'
 import { productService, ProductPayload } from '@/services/productService'
 import { produtoLoteService, ProdutoLotePayload } from '@/services/produtoLoteService'
 import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
-import { Product, ProdutoLote, ParametroEmpresa, TipoControle } from '@/types'
+import { Product, ProdutoLote, ParametroEmpresa, TipoControle, TipoEstabelecimentoFastFood } from '@/types'
 import { useRouter } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
 import { appConfirm } from '@/lib/dialogs'
@@ -19,6 +20,7 @@ type FormState = {
   gtinEan: string
   descricao: string
   categoria: string
+  imagemUrl: string
   price: string
   estoqueMinimo: string
   stock: string
@@ -46,6 +48,7 @@ const emptyForm: FormState = {
   gtinEan: '',
   descricao: '',
   categoria: '',
+  imagemUrl: '',
   price: '',
   estoqueMinimo: '0',
   stock: '',
@@ -55,6 +58,15 @@ const emptyForm: FormState = {
   exigeValidade: false,
   registroMs: '',
   pmc: '',
+}
+
+const CATEGORIAS_SUGERIDAS_POR_TIPO: Partial<Record<TipoEstabelecimentoFastFood, string[]>> = {
+  HAMBURGUERIA: ['Destaques', 'Lanches', 'Combos', 'Acompanhamentos', 'Bebidas', 'Sobremesas'],
+  PIZZARIA: ['Tradicionais', 'Especiais', 'Combos', 'Doces', 'Bebidas'],
+  RESTAURANTE: ['Entradas', 'Pratos principais', 'Combos', 'Bebidas', 'Sobremesas'],
+  LANCHONETE: ['Sanduíches', 'Combos', 'Porções', 'Bebidas', 'Sobremesas'],
+  ACAI_SORVETERIA: ['Açaí', 'Sorvetes', 'Combos', 'Complementos', 'Bebidas'],
+  OUTROS: ['Cardápio', 'Combos', 'Bebidas'],
 }
 
 export default function ProductsPage() {
@@ -75,6 +87,7 @@ export default function ProductsPage() {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [importFinished, setImportFinished] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const productImageInputRef = useRef<HTMLInputElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeBufferRef = useRef('')
   const barcodeLastKeyTimeRef = useRef(0)
@@ -89,8 +102,50 @@ export default function ProductsPage() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState('')
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [uploadingProductImage, setUploadingProductImage] = useState(false)
 
   const isFarmacia = !!parametro?.moduloFarmaciaAtivo
+  const isFastFood = !!parametro?.moduloFastFoodAtivo
+  const categoriaOptions = useMemo(() => {
+    const tipo = parametro?.tipoEstabelecimentoFastFood
+    const preset = (tipo && CATEGORIAS_SUGERIDAS_POR_TIPO[tipo]) ?? []
+    const seen = new Set<string>()
+    const out: string[] = []
+
+    for (const c of preset) {
+      const key = c.trim().toLocaleLowerCase('pt-BR')
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push(c)
+    }
+
+    for (const p of products) {
+      const c = (p.categoria ?? '').trim()
+      const key = c.toLocaleLowerCase('pt-BR')
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push(c)
+    }
+
+    return out
+  }, [parametro?.tipoEstabelecimentoFastFood, products])
+
+  async function handleProductImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setUploadingProductImage(true)
+    setError('')
+    try {
+      const { url } = await productService.uploadImage(f)
+      setForm(prev => ({ ...prev, imagemUrl: url }))
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } }
+      setError(ax.response?.data?.error || 'Falha ao enviar imagem.')
+    } finally {
+      setUploadingProductImage(false)
+      e.target.value = ''
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
@@ -130,6 +185,7 @@ export default function ProductsPage() {
       gtinEan: p.gtinEan ?? '',
       descricao: p.descricao ?? '',
       categoria: p.categoria ?? '',
+      imagemUrl: p.imagemUrl ?? '',
       price: String(p.price),
       estoqueMinimo: String(p.estoqueMinimo ?? 0),
       stock: String(p.stock),
@@ -167,6 +223,12 @@ export default function ProductsPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
+    const img = (form.imagemUrl ?? '').trim()
+    if (isFastFood && img && !/^https?:\/\//i.test(img)) {
+      setError('URL da imagem deve começar com http:// ou https://')
+      setSaving(false)
+      return
+    }
     try {
       const payload: ProductPayload = {
         name: form.name,
@@ -176,6 +238,7 @@ export default function ProductsPage() {
         gtinEan: form.gtinEan || undefined,
         descricao: form.descricao || undefined,
         categoria: form.categoria || undefined,
+        imagemUrl: img || undefined,
         estoqueMinimo: Number(form.estoqueMinimo) || 0,
         ...(isFarmacia && {
           tipoControle: form.tipoControle,
@@ -286,6 +349,7 @@ export default function ProductsPage() {
       codigoProduto: rowValue(row, ['codigoproduto', 'codigo', 'sku']) || undefined,
       gtinEan: rowValue(row, ['gtinean', 'ean', 'gtin']) || undefined,
       categoria: rowValue(row, ['categoria']) || undefined,
+      imagemUrl: rowValue(row, ['imagemurl', 'imagem_url', 'foto', 'urlimagem']) || undefined,
       descricao: rowValue(row, ['descricao', 'descricao']) || undefined,
       estoqueMinimo: parseNumber(rowValue(row, ['estoqueminimo', 'minimo'])) || 0,
     }
@@ -565,7 +629,9 @@ export default function ProductsPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Importacao de produtos</p>
-                <p className="text-xs text-gray-500">CSV com colunas: nome, preco, estoque, codigoProduto, categoria, descricao</p>
+                <p className="text-xs text-gray-500">
+                  CSV: nome, preco, estoque, codigoProduto, categoria, imagemUrl (URL https da foto), descricao…
+                </p>
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary py-2 px-4">
@@ -663,14 +729,24 @@ export default function ProductsPage() {
               <table className="w-full">
                 <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                   <tr>
-                    {['Código', 'Produto', 'Preço', 'Estoque', ...(isFarmacia ? ['Controle'] : []), 'Ações'].map(h => (
-                      <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">{h}</th>
+                    {[...(isFastFood ? ['Foto'] : []), 'Código', 'Produto', 'Preço', 'Estoque', ...(isFarmacia ? ['Controle'] : []), 'Ações'].map((h, i) => (
+                      <th
+                        key={h + String(i)}
+                        className={`text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 ${isFastFood && i === 0 ? 'w-[4.5rem]' : ''}`}
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredProducts.map(p => (
                     <tr key={p.id} className="hover:bg-gray-50">
+                      {isFastFood && (
+                        <td className="px-6 py-3 align-middle">
+                          <ProductThumb imagemUrl={p.imagemUrl} size={44} />
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-gray-500 text-sm font-mono">{p.codigoProduto || p.gtinEan || '—'}</td>
                       <td className="px-6 py-4 font-medium text-gray-800">
                         {p.name}
@@ -771,20 +847,26 @@ export default function ProductsPage() {
       {/* ── Modal Produto ────────────────────────────────────────────────────── */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg my-8">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8">
             <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">{editing ? 'Editar Produto' : 'Novo Produto'}</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-6 md:p-8 space-y-6">
 
               {/* Identificação */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do produto <span className="text-red-500">*</span></label>
-                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="input-field" placeholder="Ex: Paracetamol 750mg" />
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Dados principais</p>
+                  <p className="text-xs text-gray-500">Preencha as informações básicas para identificar o item no cardápio e no PDV.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome do produto <span className="text-red-500">*</span></label>
+                  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="input-field" placeholder="Digite o nome do produto" />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Código interno</label>
                   <input value={form.codigoProduto} onChange={e => setForm({ ...form, codigoProduto: e.target.value })} className="input-field" placeholder="000001" />
@@ -795,10 +877,21 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                  <input value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })} className="input-field" placeholder="Ex: Analgésicos" />
+                  <input
+                    value={form.categoria}
+                    onChange={e => setForm({ ...form, categoria: e.target.value })}
+                    className="input-field"
+                    placeholder="Selecione ou digite a categoria"
+                    list="categoria-options"
+                  />
+                  <datalist id="categoria-options">
+                    {categoriaOptions.map(option => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estoque mínimo</label>
@@ -806,8 +899,64 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {isFastFood && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 md:p-5 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Imagem do produto</p>
+                    <p className="text-xs text-gray-500">A imagem aparece no totem e no cardápio digital.</p>
+                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL da imagem (opcional)</label>
+                  <input
+                    value={form.imagemUrl}
+                    onChange={e => setForm({ ...form, imagemUrl: e.target.value })}
+                    className="input-field"
+                    placeholder="https://seusite.com/imagem-do-produto.jpg"
+                    inputMode="url"
+                    autoComplete="off"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Você pode colar a URL ou enviar um arquivo do computador.
+                  </p>
+                  <input
+                    ref={productImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleProductImageUpload}
+                  />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      disabled={uploadingProductImage}
+                      onClick={() => productImageInputRef.current?.click()}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      {uploadingProductImage ? 'Enviando…' : 'Enviar imagem do computador'}
+                    </button>
+                  </div>
+                  {form.imagemUrl.trim().match(/^https?:\/\//i) ? (
+                    <div className="mt-2 flex justify-center rounded-lg border border-gray-200 bg-white p-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={form.imagemUrl.trim()}
+                        alt=""
+                        className="max-h-32 max-w-full object-contain"
+                        onError={e => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               {/* Preço / Estoque */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Venda e controle</p>
+                  <p className="text-xs text-gray-500">Defina valor e quantidade para operação no caixa.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$) <span className="text-red-500">*</span></label>
                   <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required className="input-field" placeholder="0,00" />
@@ -815,6 +964,7 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estoque <span className="text-red-500">*</span></label>
                   <input type="number" min="0" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} required className="input-field" placeholder="0" />
+                </div>
                 </div>
               </div>
 
@@ -861,7 +1011,7 @@ export default function ProductsPage() {
               )}
 
               {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{error}</div>}
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancelar</button>
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>

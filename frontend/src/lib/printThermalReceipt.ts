@@ -22,6 +22,8 @@ export function labelFormaPagamento(forma: FormaPagamento, parcelas: number): st
       return 'PIX'
     case 'CARTAO':
       return parcelas > 1 ? `Cartão ${parcelas}x` : 'Cartão (crédito)'
+    case 'VOUCHER':
+      return 'Vale refeição (voucher)'
     default:
       return String(forma)
   }

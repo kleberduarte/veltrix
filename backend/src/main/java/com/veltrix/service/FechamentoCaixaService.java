@@ -34,6 +34,7 @@ public class FechamentoCaixaService {
         BigDecimal cartao = soma(orders, FormaPagamento.CARTAO);
         BigDecimal debito = soma(orders, FormaPagamento.DEBITO);
         BigDecimal pix = soma(orders, FormaPagamento.PIX);
+        BigDecimal voucher = soma(orders, FormaPagamento.VOUCHER);
 
         return ResumoDiaResponse.builder()
                 .quantidadeVendas((long) orders.size())
@@ -41,7 +42,8 @@ public class FechamentoCaixaService {
                 .totalCartao(cartao)
                 .totalDebito(debito)
                 .totalPix(pix)
-                .totalGeral(dinheiro.add(cartao).add(debito).add(pix))
+                .totalVoucher(voucher)
+                .totalGeral(dinheiro.add(cartao).add(debito).add(pix).add(voucher))
                 .jaFechado(fechamentoRepository.existsByCompanyIdAndDataReferencia(companyId, LocalDate.now()))
                 .build();
     }
@@ -68,6 +70,7 @@ public class FechamentoCaixaService {
                 .totalCartao(resumo.getTotalCartao())
                 .totalDebito(resumo.getTotalDebito())
                 .totalPix(resumo.getTotalPix())
+                .totalVoucher(resumo.getTotalVoucher())
                 .totalGeral(resumo.getTotalGeral())
                 .valorInformadoDinheiro(valorInformado)
                 .diferencaDinheiro(diferenca)
@@ -95,7 +98,9 @@ public class FechamentoCaixaService {
         r.setQuantidadeVendas(fc.getQuantidadeVendas());
         r.setTotalDinheiro(fc.getTotalDinheiro()); r.setTotalCartao(fc.getTotalCartao());
         r.setTotalDebito(fc.getTotalDebito());
-        r.setTotalPix(fc.getTotalPix()); r.setTotalGeral(fc.getTotalGeral());
+        r.setTotalPix(fc.getTotalPix());
+        r.setTotalVoucher(fc.getTotalVoucher());
+        r.setTotalGeral(fc.getTotalGeral());
         r.setValorInformadoDinheiro(fc.getValorInformadoDinheiro());
         r.setDiferencaDinheiro(fc.getDiferencaDinheiro());
         return r;
