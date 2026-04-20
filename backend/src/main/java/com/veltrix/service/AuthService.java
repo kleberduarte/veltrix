@@ -73,6 +73,7 @@ public class AuthService {
         String senhaInterna = definirSenhaSóNoPrimeiroAcesso
                 ? passwordEncoder.encode(UUID.randomUUID().toString() + UUID.randomUUID())
                 : passwordEncoder.encode(request.getPassword());
+        Role inviteRole = resolveInviteRole(company.getId());
 
         User user = userRepository.save(User.builder()
                 .company(company)
@@ -80,7 +81,7 @@ public class AuthService {
                 .email(normalizeEmail(request.getEmail()))
                 .password(senhaInterna)
                 .telefone(null)
-                .role(Role.VENDEDOR)
+                .role(inviteRole)
                 .mustChangePassword(true)
                 .inviteSelfRegistration(definirSenhaSóNoPrimeiroAcesso)
                 .build());
@@ -544,6 +545,19 @@ public class AuthService {
             sb.append(chars.charAt(r.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    /**
+     * Convite público da empresa:
+     * - Fast Food ativo: cria usuário de totem.
+     * - Demais cenários: mantém fluxo tradicional de vendedor.
+     */
+    private Role resolveInviteRole(Long companyId) {
+        return parametroEmpresaRepository.findByCompanyId(companyId)
+                .map(ParametroEmpresa::getModuloFastFoodAtivo)
+                .filter(Boolean.TRUE::equals)
+                .map(active -> Role.TOTEM)
+                .orElse(Role.VENDEDOR);
     }
 
     private CreateUserResponse toCreateUserResponse(User user, String senhaTemporaria) {
