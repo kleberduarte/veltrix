@@ -42,12 +42,23 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Propaga o traceId do backend para facilitar debugging
+    const traceId = error.response?.headers?.['x-trace-id']
+    if (traceId && error.response) {
+      error.response.traceId = traceId
+    }
+
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const redirectPath = getLogoutRedirectPath()
       localStorage.removeItem('veltrix_token')
       localStorage.removeItem('veltrix_user')
       window.location.href = redirectPath
     }
+
+    if (error.response?.status === 500) {
+      console.error(`[API 500] traceId=${traceId ?? 'n/a'}`, error.config?.url)
+    }
+
     return Promise.reject(error)
   }
 )

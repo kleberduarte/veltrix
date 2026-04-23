@@ -4,6 +4,7 @@ import './globals.css'
 import GlobalDialogs from '@/components/ui/GlobalDialogs'
 import EmpresaTheme from '@/components/theme/EmpresaTheme'
 import PwaRegister from '@/components/pwa/PwaRegister'
+import AppShell from '@/components/ui/AppShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,9 +34,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <EmpresaTheme>{children}</EmpresaTheme>
-        <GlobalDialogs />
-        <PwaRegister />
+        <AppShell>
+          <EmpresaTheme>{children}</EmpresaTheme>
+          <GlobalDialogs />
+          <PwaRegister />
+        </AppShell>
       </body>
     </html>
   )
