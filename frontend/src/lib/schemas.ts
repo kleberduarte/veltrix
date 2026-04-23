@@ -51,7 +51,7 @@ export const changePasswordSchema = z
 
 export const productSchema = z.object({
   nome: z.string().min(1, 'Nome obrigatório'),
-  preco: z.number({ invalid_type_error: 'Preço inválido' }).positive('Preço deve ser positivo'),
+  preco: z.number().positive('Preço deve ser positivo'),
   estoque: z.number().int('Estoque deve ser inteiro').min(0, 'Estoque não pode ser negativo').optional(),
   codigoBarras: z.string().optional(),
   descricao: z.string().optional(),
