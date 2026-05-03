@@ -1,5 +1,6 @@
 package com.veltrix.security;
 
+import com.veltrix.repository.BlacklistedTokenRepository;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -18,22 +19,22 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
+    private final BlacklistedTokenRepository blacklistedTokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
-            String authHeader = request.getHeader("Authorization");
+            String token = extractToken(request);
 
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            if (token == null || !jwtUtil.isTokenValid(token)) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            String token = authHeader.substring(7);
-
-            if (!jwtUtil.isTokenValid(token)) {
+            String jti = jwtUtil.extractJti(token);
+            if (jti != null && blacklistedTokenRepository.existsByJti(jti)) {
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -56,5 +57,20 @@ public class JwtFilter extends OncePerRequestFilter {
         } finally {
             TenantContext.clear();
         }
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("veltrix_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 }

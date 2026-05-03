@@ -41,6 +41,8 @@ export function removeAuth() {
     } catch {
       /* ignore */
     }
+    // Limpa cookie HttpOnly via Route Handler
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {/* ignora */})
   }
 }
 

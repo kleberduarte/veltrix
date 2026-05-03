@@ -53,6 +53,11 @@ public class SecurityStartupValidator {
             if (DEV_JWT_SECRET.equals(jwtSecret)) {
                 log.warn("AVISO: Usando JWT_SECRET padrão de desenvolvimento. Nunca use este valor em produção.");
             }
+            if (globalAdminPassword == null || globalAdminPassword.isBlank()) {
+                throw new IllegalStateException(
+                    "SEGURANÇA: GLOBAL_ADMIN_PASSWORD não está definida. " +
+                    "Defina a variável de ambiente GLOBAL_ADMIN_PASSWORD antes de iniciar.");
+            }
         }
     }
 }

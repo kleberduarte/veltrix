@@ -2,15 +2,45 @@ import { z } from 'zod'
 
 // ─── Primitivos ───────────────────────────────────────────────────────────────
 
+function validarCpf(digits: string): boolean {
+  if (digits.length !== 11 || /^(\d)\1+$/.test(digits)) return false
+  let sum = 0
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i)
+  let r = (sum * 10) % 11
+  if (r === 10 || r === 11) r = 0
+  if (r !== parseInt(digits[9])) return false
+  sum = 0
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i)
+  r = (sum * 10) % 11
+  if (r === 10 || r === 11) r = 0
+  return r === parseInt(digits[10])
+}
+
+function validarCnpj(digits: string): boolean {
+  if (digits.length !== 14 || /^(\d)\1+$/.test(digits)) return false
+  const calc = (d: string, w: number[]): number => {
+    let s = 0
+    for (let i = 0; i < w.length; i++) s += parseInt(d[i]) * w[i]
+    const r = s % 11
+    return r < 2 ? 0 : 11 - r
+  }
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  return calc(digits, w1) === parseInt(digits[12]) &&
+         calc(digits, w2) === parseInt(digits[13])
+}
+
 const cpf = z
   .string()
   .transform(s => s.replace(/\D/g, ''))
   .refine(d => d.length === 11, 'CPF deve ter 11 dígitos')
+  .refine(validarCpf, 'CPF inválido')
 
 const cnpj = z
   .string()
   .transform(s => s.replace(/\D/g, ''))
   .refine(d => d.length === 14, 'CNPJ deve ter 14 dígitos')
+  .refine(validarCnpj, 'CNPJ inválido')
 
 const telefone = z
   .string()

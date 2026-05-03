@@ -4,22 +4,25 @@ import com.veltrix.model.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class CreateUserRequest {
-    @NotBlank
+    @NotBlank @Size(max = 255)
     private String name;
 
-    @NotBlank @Email
+    @NotBlank @Email @Size(max = 255)
     private String email;
 
     /** Vazio = senha gerada automaticamente (usuário deve trocar no 1º acesso se mustChangePassword). */
+    @Size(max = 100)
     private String password;
 
     @NotNull
     private Role role;
 
+    @Size(max = 20)
     private String telefone;
     private Boolean mustChangePassword;
 
