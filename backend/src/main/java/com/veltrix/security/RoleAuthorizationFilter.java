@@ -14,8 +14,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Restringe os perfis {@link Role#VENDEDOR} e {@link Role#TOTEM} a rotinas de PDV e vendas
- * (não cadastra produtos, relatórios, OS, etc.). Totem fica no mesmo conjunto de APIs permitidas.
+ * Allowlist para VENDEDOR e TOTEM: só podem acessar rotas de PDV/vendas explicitamente listadas.
+ * Tudo que não estiver na lista é negado — modelo de menor privilégio.
  */
 @Component
 @RequiredArgsConstructor
@@ -42,7 +42,7 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (isDeniedForVendedorOrTotem(request)) {
+        if (!isAllowedForVendedorOrTotem(request)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"status\":403,\"error\":\"Acesso negado para este perfil.\"}");
@@ -52,17 +52,40 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean isDeniedForVendedorOrTotem(HttpServletRequest req) {
+    /**
+     * Rotas permitidas para VENDEDOR e TOTEM.
+     * Novos controllers são bloqueados por padrão — adicione aqui se necessário.
+     */
+    private boolean isAllowedForVendedorOrTotem(HttpServletRequest req) {
         String path = servletPath(req);
         String m = req.getMethod();
-        if (path.startsWith("/reports")) return true;
-        if (path.startsWith("/auth/users")) return true;
-        if (path.startsWith("/auth/companies")) return true;
-        if (path.startsWith("/ordens-servico")) return true;
-        if ("POST".equals(m) && "/parametros-empresa".equals(path)) return true;
-        if ("POST".equals(m) && "/products".equals(path)) return true;
-        if ("POST".equals(m) && "/products/imagem".equals(path)) return true;
-        if (("PUT".equals(m) || "DELETE".equals(m)) && path.startsWith("/products")) return true;
+
+        // Autenticação própria
+        if ("GET".equals(m)  && "/auth/me".equals(path))           return true;
+        if ("POST".equals(m) && "/auth/trocar-senha".equals(path))  return true;
+        if ("POST".equals(m) && "/auth/primeira-senha-convite".equals(path)) return true;
+        if ("POST".equals(m) && "/auth/logout".equals(path))        return true;
+
+        // Consulta de produtos (PDV/totem precisa listar e buscar)
+        if ("GET".equals(m)  && path.startsWith("/products"))       return true;
+
+        // Pedidos: criar e consultar os próprios
+        if ("GET".equals(m)  && path.startsWith("/orders"))         return true;
+        if ("POST".equals(m) && "/orders".equals(path))             return true;
+
+        // PDV invite (totem pode verificar o seu próprio convite)
+        if ("GET".equals(m)  && "/auth/pdv-invite".equals(path))    return true;
+
+        // Parâmetros da empresa (leitura para branding/totem)
+        if ("GET".equals(m)  && "/parametros-empresa".equals(path)) return true;
+
+        // Clientes: criar e buscar (PDV)
+        if ("GET".equals(m)  && path.startsWith("/clientes"))       return true;
+        if ("POST".equals(m) && "/clientes".equals(path))           return true;
+
+        // Fechamento de caixa (VENDEDOR)
+        if (path.startsWith("/fechamento-caixa"))                   return true;
+
         return false;
     }
 

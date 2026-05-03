@@ -21,9 +21,11 @@ public class ClienteRequest {
     @Size(min = 8, max = 20, message = "Telefone deve ter entre 8 e 20 caracteres")
     private String telefone;
 
+    @Size(max = 300)
     private String endereco;
 
     /** CEP com 8 dígitos (sem hífen); opcional se endereço livre for enviado. */
+    @Size(max = 9)
     private String cep;
 
     @NotBlank(message = "CPF é obrigatório")

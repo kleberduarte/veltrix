@@ -10,14 +10,22 @@ import java.time.LocalDate;
 @Data
 public class ProductRequest {
     @NotBlank
+    @Size(max = 255)
     private String name;
 
+    @Size(max = 100)
     private String codigoProduto;
+
+    @Size(max = 20)
     private String gtinEan;
+
+    @Size(max = 2000)
     private String descricao;
+
+    @Size(max = 100)
     private String categoria;
 
-    /** URL da imagem (totem / cardápio); opcional. */
+    @Size(max = 1000)
     private String imagemUrl;
 
     @NotNull @DecimalMin("0.01")
@@ -39,6 +47,9 @@ public class ProductRequest {
     private Boolean exigeReceita = false;
     private Boolean exigeLote = false;
     private Boolean exigeValidade = false;
+
+    @Size(max = 50)
     private String registroMs;
+
     private BigDecimal pmc;
 }

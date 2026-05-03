@@ -26,7 +26,8 @@
         <!-- Defaults for mvn flyway:* (align with application.properties; override with -Dflyway.password=...) -->
         <flyway.url>jdbc:mysql://localhost:3306/veltrix?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Sao_Paulo</flyway.url>
         <flyway.user>root</flyway.user>
-        <flyway.password>1234</flyway.password>
+        <!-- Sobrescreva em CLI: mvn flyway:migrate -Dflyway.password=SUA_SENHA -->
+        <flyway.password></flyway.password>
     </properties>
 
     <dependencies>

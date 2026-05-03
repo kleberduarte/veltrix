@@ -40,7 +40,6 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                        .contentTypeOptions(HeadersConfigurer.ContentTypeOptionsConfig::disable)
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .maxAgeInSeconds(31536000)
                                 .includeSubDomains(true))
@@ -48,16 +47,14 @@ public class SecurityConfig {
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives("default-src 'self'; frame-ancestors 'none'"))
-                        .addHeaderWriter((req, res) -> {
-                            res.setHeader("X-Content-Type-Options", "nosniff");
-                            res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-                        })
+                        .addHeaderWriter((req, res) ->
+                            res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()"))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/actuator/prometheus", "/actuator/info").hasRole("ADM")
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").hasRole("ADM")
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/register",
                                 "/auth/login",
@@ -82,7 +79,7 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(true); // necessário para cookies HttpOnly de sessão
         config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

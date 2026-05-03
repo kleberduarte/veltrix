@@ -22,6 +22,8 @@ import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Logger auditLog = LoggerFactory.getLogger("veltrix.audit");
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
@@ -185,9 +189,6 @@ public class AuthService {
             plain = gerarSenhaProvisoria();
             gerada = true;
         } else {
-            if (request.getPassword().length() < 4) {
-                throw new IllegalArgumentException("Senha deve ter pelo menos 4 caracteres");
-            }
             if (request.getPassword().length() < 8) {
                 throw new IllegalArgumentException("Senha deve ter pelo menos 8 caracteres");
             }
@@ -625,12 +626,13 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse switchCompany(Long companyId) {
+    public AuthResponse switchCompany(Long companyId, String clientIp) {
         User user = getCurrentUser();
         Company target = companyRepository.findById(companyId)
                 .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada"));
         if (user.getRole() == Role.ADM) {
-            // pode alternar para qualquer empresa
+            auditLog.info("ADM_SWITCH_COMPANY usuario={} email={} empresaDestino={} nomeEmpresa={} ip={}",
+                    user.getId(), user.getEmail(), target.getId(), target.getName(), clientIp);
         } else {
             if (!user.getCompany().getId().equals(companyId)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sem permissão para acessar esta empresa.");
