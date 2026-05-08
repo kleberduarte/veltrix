@@ -1,0 +1,15 @@
+# ─── Modelo para desenvolvimento local ───────────────────────────────────────
+# Copie para application-local.properties (não versionado):
+#   Copy-Item src/main/resources/application-local.properties.example src/main/resources/application-local.properties
+#
+# MySQL no Docker (recomendado; porta 3307 para não conflituar com MySQL na 3306):
+#   Na raiz: docker compose up -d
+#   Backend: mvn spring-boot:run "-Dspring-boot.run.profiles=local,docker"
+#
+# MySQL já instalado na porta 3306 com outra senha:
+#   $env:DB_PASSWORD="sua_senha"
+#   mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+
+spring.datasource.password=${DB_PASSWORD:1234}
+
+veltrix.global-admin.password=${GLOBAL_ADMIN_PASSWORD:AdmGlobal2024!}

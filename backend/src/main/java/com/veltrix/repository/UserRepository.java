@@ -18,6 +18,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailAndIdNot(String email, Long id);
 
+    @Query("SELECT u.company.id FROM User u WHERE u.email = :email")
+    Optional<Long> findCompanyIdByEmail(@Param("email") String email);
+
     /** Anula o vínculo com terminal PDV de todos os usuários de uma empresa antes de deletar os terminais. */
     @Modifying
     @Query("UPDATE User u SET u.pdvTerminal = null WHERE u.company.id = :companyId")

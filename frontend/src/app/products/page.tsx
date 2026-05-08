@@ -9,6 +9,7 @@ import { Product, ProdutoLote, ParametroEmpresa, TipoControle, TipoEstabelecimen
 import { useRouter } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
 import { appConfirm } from '@/lib/dialogs'
+import { absolutizeProductImageUrlIfRelative, resolveProductImageUrl } from '@/lib/productImage'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -104,6 +105,8 @@ export default function ProductsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [uploadingProductImage, setUploadingProductImage] = useState(false)
 
+  const imagemFormPreviewSrc = useMemo(() => resolveProductImageUrl(form.imagemUrl), [form.imagemUrl])
+
   const isFarmacia = !!parametro?.moduloFarmaciaAtivo
   const isFastFood = !!parametro?.moduloFastFoodAtivo
   const categoriaOptions = useMemo(() => {
@@ -137,7 +140,7 @@ export default function ProductsPage() {
     setError('')
     try {
       const { url } = await productService.uploadImage(f)
-      setForm(prev => ({ ...prev, imagemUrl: url }))
+      setForm(prev => ({ ...prev, imagemUrl: absolutizeProductImageUrlIfRelative(url) }))
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } }
       setError(ax.response?.data?.error || 'Falha ao enviar imagem.')
@@ -185,7 +188,7 @@ export default function ProductsPage() {
       gtinEan: p.gtinEan ?? '',
       descricao: p.descricao ?? '',
       categoria: p.categoria ?? '',
-      imagemUrl: p.imagemUrl ?? '',
+      imagemUrl: absolutizeProductImageUrlIfRelative(p.imagemUrl ?? ''),
       price: String(p.price),
       estoqueMinimo: String(p.estoqueMinimo ?? 0),
       stock: String(p.stock),
@@ -223,7 +226,7 @@ export default function ProductsPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
-    const img = (form.imagemUrl ?? '').trim()
+    const img = absolutizeProductImageUrlIfRelative(form.imagemUrl ?? '')
     if (isFastFood && img && !/^https?:\/\//i.test(img)) {
       setError('URL da imagem deve começar com http:// ou https://')
       setSaving(false)
@@ -934,11 +937,11 @@ export default function ProductsPage() {
                       {uploadingProductImage ? 'Enviando…' : 'Enviar imagem do computador'}
                     </button>
                   </div>
-                  {form.imagemUrl.trim().match(/^https?:\/\//i) ? (
+                  {imagemFormPreviewSrc ? (
                     <div className="mt-2 flex justify-center rounded-lg border border-gray-200 bg-white p-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={form.imagemUrl.trim()}
+                        src={imagemFormPreviewSrc}
                         alt=""
                         className="max-h-32 max-w-full object-contain"
                         onError={e => {

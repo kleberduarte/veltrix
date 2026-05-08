@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
+import { resolveProductImageUrl } from '@/lib/productImage'
 
 type Props = {
   imagemUrl?: string | null
@@ -13,12 +14,12 @@ type Props = {
 /** Miniatura para listagens e modais; fallback se URL inválida ou erro de carga. Usa next/image com unoptimized para qualquer origem (CDN ou /files da API). */
 export default function ProductThumb({ imagemUrl, size = 40, className = '' }: Props) {
   const [failed, setFailed] = useState(false)
-  const u = imagemUrl?.trim()
-  const ok = Boolean(u && /^https?:\/\//i.test(u) && !failed)
+  const u = resolveProductImageUrl(imagemUrl)
+  const ok = Boolean(u && !failed)
 
   useEffect(() => {
     setFailed(false)
-  }, [u])
+  }, [imagemUrl])
 
   if (!ok) {
     return (

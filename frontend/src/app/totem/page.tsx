@@ -15,6 +15,7 @@ import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
 import { getAuth, isAuthenticated } from '@/lib/auth'
 import { defaultHomePath } from '@/lib/roleAccess'
 import { appAlert } from '@/lib/dialogs'
+import { resolveProductImageUrl } from '@/lib/productImage'
 import type { ParametroEmpresa, Product, TipoEstabelecimentoFastFood } from '@/types'
 import { useRouter } from 'next/navigation'
 
@@ -123,8 +124,8 @@ function TotemProdutoImagem({
   fallbackBg: CSSProperties['background']
 }) {
   const [failed, setFailed] = useState(false)
-  const u = imagemUrl?.trim()
-  const ok = Boolean(u && /^https?:\/\//i.test(u) && !failed)
+  const u = resolveProductImageUrl(imagemUrl)
+  const ok = Boolean(u && !failed)
   return (
     <div
       className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden text-4xl"

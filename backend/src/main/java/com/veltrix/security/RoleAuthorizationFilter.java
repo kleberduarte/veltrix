@@ -86,6 +86,10 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         // Fechamento de caixa (VENDEDOR)
         if (path.startsWith("/fechamento-caixa"))                   return true;
 
+        // Terminais PDV: listar e heartbeat (PDV / totem)
+        if ("GET".equals(m) && "/pdv-terminais".equals(path))      return true;
+        if ("POST".equals(m) && path.matches("/pdv-terminais/[0-9]+/heartbeat")) return true;
+
         return false;
     }
 
