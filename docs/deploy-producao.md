@@ -61,16 +61,17 @@ O app Next.js está em **`frontend/`**, não na raiz do Git.
 
 Com isso, a Vercel faz `npm install` e `npm run build` **dentro de `frontend/`** e usa o pipeline nativo do Next.
 
-### Se deixar Root Directory vazio (raiz do repo)
+### Importante: não use a raiz do monorepo como Root Directory
 
-O repositório inclui `vercel.json` na raiz com `framework: nextjs`, `installCommand` e `buildCommand` em `frontend/`, e o `package.json` da raiz roda `cd frontend && npm install && npm run build` para existir `node_modules` com o `next`.
+Se o **Root Directory** ficar na raiz do Git (`.`), o build até pode passar com scripts personalizados, mas o pipeline nativo do Next.js **não** trata o app como uma única raiz de projeto — em produção costuma aparecer **`404` em rotas de API** do App Router (ex.: `POST /api/auth/login`, proxy do login com cookie HttpOnly).
 
-Se aparecer **`next: command not found`**, a Vercel rodou `npm install` só na raiz — use **Root Directory = `frontend`** ou garanta o último commit com esse `package.json` / `vercel.json`.
+**Solução:** mantenha sempre **Root Directory = `frontend`** (não há como definir isso só via `vercel.json`; é configuração do projeto no painel).
 
 ### Erros conhecidos
 
 - *“No Output Directory named public”* após build OK: geralmente **Output Directory** preenchido com `public` ou preset errado; deixe vazio e prefira **Root Directory = `frontend`**.
 - **`404 NOT_FOUND`** no `/` ou no domínio Vercel: confira Root Directory, deploy **Ready** e logs de build.
+- **`404`** em **`POST /api/auth/login`** com deploy **Ready**: quase sempre **Root Directory** não é `frontend`; corrija, limpe **Output Directory** se estiver como `public`, faça **Redeploy**. Confira também **Deployment → Functions** se aparece `api/auth/[...path]`.
 
 ### 3.2 Variáveis e build
 
@@ -79,6 +80,7 @@ Se aparecer **`next: command not found`**, a Vercel rodou `npm install` só na r
    | Variável | Valor |
    |----------|--------|
    | `NEXT_PUBLIC_API_URL` | URL pública do backend Railway, **sem barra final** (ex.: `https://seu-servico.up.railway.app`). |
+   | `BACKEND_URL` | Mesma base da API (ou URL que o **servidor** Next alcança). Usada pelo Route Handler `app/api/auth/*` para o proxy de login e cookie HttpOnly. Se omitida, o código usa `NEXT_PUBLIC_API_URL`. |
 
 2. **Redeploy** após alterar variáveis (elas são embutidas no build do Next).
 
@@ -97,6 +99,7 @@ Mensagem do tipo *“A listener indicated an asynchronous response…”* costum
 - [ ] API responde: `GET https://<sua-api>/actuator/health`
 - [ ] `CORS_ALLOWED_ORIGINS` inclui exatamente a origem do Vercel (protocolo + host, sem path)
 - [ ] `NEXT_PUBLIC_API_URL` no Vercel = mesma base da API usada no browser
+- [ ] `BACKEND_URL` definida no Vercel (ou confiar no fallback para `NEXT_PUBLIC_API_URL`)
 - [ ] `JWT_SECRET` forte e exclusivo de produção
 - [ ] Bootstrap de admin desabilitado após uso (`GLOBAL_ADMIN_BOOTSTRAP_ENABLED=false`)
 

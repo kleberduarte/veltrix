@@ -1,0 +1,27 @@
+# Banco local para o backend Veltrix (perfil Spring "local" + "docker").
+# Senha root = 1234. Porta no host: 3307 (evita conflito com MySQL na 3306 do Windows).
+#
+# Subir: docker compose up -d
+# Parar:  docker compose down
+#
+# App: mvn spring-boot:run "-Dspring-boot.run.profiles=local,docker"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: veltrix-mysql-local
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "1234"
+      MYSQL_DATABASE: veltrix
+    ports:
+      - "3307:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p1234"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s

@@ -58,27 +58,42 @@ public class GlobalAdminBootstrap implements ApplicationRunner {
             return;
         }
         String normalized = email.trim().toLowerCase();
-        if (userRepository.existsByEmail(normalized)) {
-            log.debug("Bootstrap do Adm Global ignorado: usuário {} já existe.", normalized);
-            return;
-        }
+        userRepository.findByEmail(normalized).ifPresentOrElse(existingUser -> {
+            // Usuário já existe: verifica se a empresa ainda existe (pode ter sido apagada por truncate)
+            Long companyId = userRepository.findCompanyIdByEmail(normalized).orElse(null);
+            boolean companyMissing = companyId == null || !companyRepository.existsById(companyId);
+            if (companyMissing) {
+                log.warn("Bootstrap do Adm Global: usuário {} existe mas empresa id={} não foi encontrada. Recriando empresa...",
+                        normalized, companyId);
+                Company company = companyRepository.save(Company.builder()
+                        .name(companyName)
+                        .accessToken(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""))
+                        .build());
+                existingUser.setCompany(company);
+                userRepository.save(existingUser);
+                authService.seedParametrosPadrao(company.getId(), companyName);
+                log.info("Empresa recriada (id={}) e vinculada ao Adm Global {}.", company.getId(), normalized);
+            } else {
+                log.debug("Bootstrap do Adm Global ignorado: usuário {} e empresa já existem.", normalized);
+            }
+        }, () -> {
+            Company company = companyRepository.save(Company.builder()
+                    .name(companyName)
+                    .accessToken(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""))
+                    .build());
 
-        Company company = companyRepository.save(Company.builder()
-                .name(companyName)
-                .accessToken(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""))
-                .build());
+            userRepository.save(User.builder()
+                    .company(company)
+                    .name(name)
+                    .email(normalized)
+                    .password(passwordEncoder.encode(password))
+                    .role(Role.ADM)
+                    .mustChangePassword(true)
+                    .build());
 
-        userRepository.save(User.builder()
-                .company(company)
-                .name(name)
-                .email(normalized)
-                .password(passwordEncoder.encode(password))
-                .role(Role.ADM)
-                .mustChangePassword(true)
-                .build());
-
-        log.info("Usuário Adm Global criado: {} (empresa: {}). Altere a senha em application.properties ou variáveis de ambiente em produção.",
-                normalized, companyName);
-        authService.seedParametrosPadrao(company.getId(), companyName);
+            log.info("Usuário Adm Global criado: {} (empresa: {}). Altere a senha em application.properties ou variáveis de ambiente em produção.",
+                    normalized, companyName);
+            authService.seedParametrosPadrao(company.getId(), companyName);
+        });
     }
 }
