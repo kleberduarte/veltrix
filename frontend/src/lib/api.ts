@@ -7,24 +7,10 @@ const api = axios.create({
   withCredentials: true,
 })
 
-/**
- * Rotas que são interceptadas pelo Next.js Route Handler (/api/auth/*).
- * O Route Handler seta o cookie HttpOnly com o JWT no domínio do frontend.
- */
-const AUTH_PROXY_PATHS = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/definir-senha-inicial',
-  '/auth/switch-company',
-  '/auth/trocar-senha',
-  '/auth/primeira-senha-convite',
-  '/auth/logout',
-]
-
 function isAuthProxyPath(url: string | undefined): boolean {
   if (!url) return false
   const path = url.startsWith('http') ? new URL(url).pathname : url.split('?')[0]
-  return AUTH_PROXY_PATHS.includes(path)
+  return path.startsWith('/auth/')
 }
 
 /** Rotas sem JWT obrigatório (email-status, company-access). */
