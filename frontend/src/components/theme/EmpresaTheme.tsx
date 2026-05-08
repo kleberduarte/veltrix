@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
 import { setDocumentFavicon } from '@/lib/empresaFavicon'
 import { parametrosEmpresaService } from '@/services/parametrosEmpresaService'
+import { normalizeLogoUrl } from '@/lib/logoUrl'
 
 const HEX = /^#[0-9A-Fa-f]{6}$/
 
@@ -123,7 +124,7 @@ export default function EmpresaTheme({ children }: { children: React.ReactNode }
     try {
       const p = await parametrosEmpresaService.get()
       aplicarCores(root, p)
-      if (!onAcessoPage) setDocumentFavicon(p?.logoUrl ?? null)
+      if (!onAcessoPage) setDocumentFavicon(normalizeLogoUrl(p?.logoUrl))
     } catch {
       aplicarCores(root, null)
       if (!onAcessoPage) setDocumentFavicon(null)
