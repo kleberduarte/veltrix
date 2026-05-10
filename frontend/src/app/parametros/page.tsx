@@ -366,6 +366,7 @@ export default function ParametrosPage() {
     if (logo) {
       if (logo.length > URL_MAX) e.logoUrl = `URL muito longa (máx. ${URL_MAX}).`
       else if (!/^https?:\/\//i.test(logo)) e.logoUrl = 'Informe uma URL http ou https válida.'
+      else if (/\.$/.test(logo.split(/[?#]/)[0] ?? '')) e.logoUrl = 'A URL do logo termina com ponto final; complete a extensão (ex.: .png).'
     }
     const msg = form.mensagemBoasVindas ?? ''
     if (msg.length > MSG_MAX) e.mensagemBoasVindas = `Máximo ${MSG_MAX} caracteres.`

@@ -12,6 +12,7 @@ import { getAuth } from '@/lib/auth'
 import { appAlert } from '@/lib/dialogs'
 import { buildPixCopiaECola, isPixKeyPlaceholder } from '@/lib/pixCopiaECola'
 import { printThermalReceipt, type ThermalReceiptExtras } from '@/lib/printThermalReceipt'
+import { normalizeLogoUrl } from '@/lib/logoUrl'
 
 export type CaixaVisual = 'LIVRE' | 'PAUSADO' | 'FECHADO'
 
@@ -147,7 +148,7 @@ export function usePdvSale() {
     setFastFood(!!par?.moduloFastFoodAtivo)
     if (par?.nomeEmpresa?.trim()) setNomeEmpresa(par.nomeEmpresa.trim())
     if (par?.logoUrl?.trim()) {
-      setLogoEmpresaUrl(par.logoUrl.trim())
+      setLogoEmpresaUrl(normalizeLogoUrl(par.logoUrl))
       setLogoFalhou(false)
     } else {
       setLogoEmpresaUrl('')

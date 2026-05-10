@@ -8,7 +8,7 @@ const PUBLIC_PATHS = [
 ]
 
 // Prefixos de assets e internos do Next.js
-const BYPASS_PREFIXES = ['/_next', '/favicon', '/api/auth']
+const BYPASS_PREFIXES = ['/_next', '/favicon', '/api/auth', '/assets']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -34,6 +34,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|assets/).*)',
   ],
 }

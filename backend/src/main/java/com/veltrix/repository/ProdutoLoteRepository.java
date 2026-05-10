@@ -10,4 +10,6 @@ public interface ProdutoLoteRepository extends JpaRepository<ProdutoLote, Long> 
     Optional<ProdutoLote> findByIdAndCompanyId(Long id, Long companyId);
     List<ProdutoLote> findByCompanyIdAndQuantidadeAtualGreaterThan(Long companyId, Integer qty);
     void deleteByCompanyId(Long companyId);
+
+    void deleteByProductIdAndCompanyId(Long productId, Long companyId);
 }

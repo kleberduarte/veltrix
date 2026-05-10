@@ -61,6 +61,8 @@ public class SecurityConfig {
                                 "/auth/email-status",
                                 "/auth/definir-senha-inicial").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/company-access/**").permitAll()
+                        // Imagens de produto: o navegador carrega sem header Bearer (JWT costuma estar só no localStorage).
+                        .requestMatchers(HttpMethod.GET, "/files/products/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

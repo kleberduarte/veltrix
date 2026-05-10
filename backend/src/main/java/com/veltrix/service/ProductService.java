@@ -2,6 +2,9 @@ package com.veltrix.service;
 
 import com.veltrix.dto.product.*;
 import com.veltrix.model.Product;
+import com.veltrix.repository.OrderItemRepository;
+import com.veltrix.repository.PmcReferenciaRepository;
+import com.veltrix.repository.ProdutoLoteRepository;
 import com.veltrix.repository.ProductRepository;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
@@ -20,6 +23,9 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProdutoLoteRepository produtoLoteRepository;
+    private final PmcReferenciaRepository pmcReferenciaRepository;
+    private final OrderItemRepository orderItemRepository;
 
     public List<ProductResponse> findAll() {
         return productRepository.findByCompanyIdAndActiveTrue(TenantContext.getCompanyId())
@@ -103,10 +109,17 @@ public class ProductService {
 
     @Transactional
     public void delete(Long id) {
-        Product product = productRepository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
+        Long companyId = TenantContext.getCompanyId();
+        Product product = productRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
-        product.setActive(false);
-        productRepository.save(product);
+        if (orderItemRepository.existsByProduct_Id(id)) {
+            product.setActive(false);
+            productRepository.save(product);
+            return;
+        }
+        produtoLoteRepository.deleteByProductIdAndCompanyId(id, companyId);
+        pmcReferenciaRepository.clearProductLink(id);
+        productRepository.delete(product);
     }
 
     @Transactional

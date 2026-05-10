@@ -7,24 +7,21 @@ const api = axios.create({
   withCredentials: true,
 })
 
-/**
- * Rotas que são interceptadas pelo Next.js Route Handler (/api/auth/*).
- * O Route Handler seta o cookie HttpOnly com o JWT no domínio do frontend.
- */
-const AUTH_PROXY_PATHS = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/definir-senha-inicial',
-  '/auth/switch-company',
-  '/auth/trocar-senha',
-  '/auth/primeira-senha-convite',
-  '/auth/logout',
-]
-
 function isAuthProxyPath(url: string | undefined): boolean {
   if (!url) return false
   const path = url.startsWith('http') ? new URL(url).pathname : url.split('?')[0]
-  return AUTH_PROXY_PATHS.includes(path)
+  return path.startsWith('/auth/')
+}
+
+function shouldProxyAuthRequests(): boolean {
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+  if (!rawApiUrl) return true
+  if (typeof window === 'undefined') return false
+  try {
+    return new URL(rawApiUrl).origin === window.location.origin
+  } catch {
+    return false
+  }
 }
 
 /** Rotas sem JWT obrigatório (email-status, company-access). */
@@ -43,7 +40,7 @@ api.interceptors.request.use((config) => {
   }
 
   // Redireciona chamadas de auth pelo Next.js Route Handler (seta cookie HttpOnly)
-  if (typeof window !== 'undefined' && isAuthProxyPath(config.url)) {
+  if (typeof window !== 'undefined' && isAuthProxyPath(config.url) && shouldProxyAuthRequests()) {
     config.baseURL = window.location.origin
     const path = (config.url || '').split('?')[0]
     config.url = `/api${path}`

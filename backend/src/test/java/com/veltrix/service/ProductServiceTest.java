@@ -1,6 +1,9 @@
 package com.veltrix.service;
 
 import com.veltrix.model.Product;
+import com.veltrix.repository.OrderItemRepository;
+import com.veltrix.repository.PmcReferenciaRepository;
+import com.veltrix.repository.ProdutoLoteRepository;
 import com.veltrix.repository.ProductRepository;
 import com.veltrix.security.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
@@ -27,6 +30,12 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private ProdutoLoteRepository produtoLoteRepository;
+    @Mock
+    private PmcReferenciaRepository pmcReferenciaRepository;
+    @Mock
+    private OrderItemRepository orderItemRepository;
 
     @InjectMocks
     private ProductService productService;
@@ -167,17 +176,35 @@ class ProductServiceTest {
     class Delete {
 
         @Test
-        void delete_marcaActiveFalse() {
+        void delete_removeDoBanco_quandoSemPedidos() {
             Product p = produtoBase(new BigDecimal("5.00"));
             p.setId(10L);
             p.setActive(true);
             when(productRepository.findByIdAndCompanyId(10L, COMPANY_ID)).thenReturn(Optional.of(p));
+            when(orderItemRepository.existsByProduct_Id(10L)).thenReturn(false);
+
+            productService.delete(10L);
+
+            verify(produtoLoteRepository).deleteByProductIdAndCompanyId(10L, COMPANY_ID);
+            verify(pmcReferenciaRepository).clearProductLink(10L);
+            verify(productRepository).delete(p);
+        }
+
+        @Test
+        void delete_quandoConstaEmPedidos_apenasDesativa() {
+            Product p = produtoBase(new BigDecimal("5.00"));
+            p.setId(10L);
+            p.setActive(true);
+            when(productRepository.findByIdAndCompanyId(10L, COMPANY_ID)).thenReturn(Optional.of(p));
+            when(orderItemRepository.existsByProduct_Id(10L)).thenReturn(true);
             when(productRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             productService.delete(10L);
 
             assertThat(p.getActive()).isFalse();
             verify(productRepository).save(p);
+            verify(productRepository, never()).delete(any());
+            verify(produtoLoteRepository, never()).deleteByProductIdAndCompanyId(anyLong(), anyLong());
         }
 
         @Test

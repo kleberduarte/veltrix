@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { setDocumentFavicon } from '@/lib/empresaFavicon'
 import LoginRegisterExperience, { type LoginBrand } from '@/components/auth/LoginRegisterExperience'
+import { normalizeLogoUrl } from '@/lib/logoUrl'
 
 export default function CompanyAccessPage() {
   const params = useParams<{ token: string | string[] }>()
@@ -25,7 +26,7 @@ export default function CompanyAccessPage() {
       .then((info) => {
         setBrand({
           nomeEmpresa: info.nomeEmpresa || info.companyName,
-          logoUrl: info.logoUrl,
+          logoUrl: normalizeLogoUrl(info.logoUrl),
           corPrimaria: info.corPrimaria,
           corSecundaria: info.corSecundaria,
           corBotao: info.corBotao,
