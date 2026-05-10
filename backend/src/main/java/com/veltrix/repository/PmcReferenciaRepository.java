@@ -2,6 +2,7 @@ package com.veltrix.repository;
 
 import com.veltrix.model.PmcReferencia;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
@@ -21,4 +22,8 @@ public interface PmcReferenciaRepository extends JpaRepository<PmcReferencia, Lo
             @Param("hoje") LocalDate hoje);
 
     void deleteByCompanyId(Long companyId);
+
+    @Modifying
+    @Query("update PmcReferencia p set p.productId = null where p.productId = :productId")
+    void clearProductLink(@Param("productId") Long productId);
 }

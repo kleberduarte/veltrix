@@ -13,6 +13,17 @@ function isAuthProxyPath(url: string | undefined): boolean {
   return path.startsWith('/auth/')
 }
 
+function shouldProxyAuthRequests(): boolean {
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+  if (!rawApiUrl) return true
+  if (typeof window === 'undefined') return false
+  try {
+    return new URL(rawApiUrl).origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
 /** Rotas sem JWT obrigatório (email-status, company-access). */
 function isPublicAuthRequest(config: InternalAxiosRequestConfig): boolean {
   const raw = config.url || ''
@@ -29,7 +40,7 @@ api.interceptors.request.use((config) => {
   }
 
   // Redireciona chamadas de auth pelo Next.js Route Handler (seta cookie HttpOnly)
-  if (typeof window !== 'undefined' && isAuthProxyPath(config.url)) {
+  if (typeof window !== 'undefined' && isAuthProxyPath(config.url) && shouldProxyAuthRequests()) {
     config.baseURL = window.location.origin
     const path = (config.url || '').split('?')[0]
     config.url = `/api${path}`

@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import PdvCupomThermal from '@/components/pdv/PdvCupomThermal'
@@ -126,6 +125,10 @@ function TotemProdutoImagem({
   const [failed, setFailed] = useState(false)
   const u = resolveProductImageUrl(imagemUrl)
   const ok = Boolean(u && !failed)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [imagemUrl])
   return (
     <div
       className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden text-4xl"
@@ -134,13 +137,12 @@ function TotemProdutoImagem({
       }}
     >
       {ok ? (
-        <Image
+        // <img>: evita exigência de remotePatterns do next/image para API/CDN (ex.: localhost:8080/files/...).
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={u!}
           alt=""
-          fill
-          unoptimized
-          className="object-cover"
-          sizes="(max-width: 1024px) 50vw, 280px"
+          className="absolute inset-0 h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
       ) : (

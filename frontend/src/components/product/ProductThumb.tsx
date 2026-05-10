@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { resolveProductImageUrl } from '@/lib/productImage'
 
@@ -11,7 +10,7 @@ type Props = {
   className?: string
 }
 
-/** Miniatura para listagens e modais; fallback se URL inválida ou erro de carga. Usa next/image com unoptimized para qualquer origem (CDN ou /files da API). */
+/** Miniatura para listagens e modais; fallback se URL inválida ou erro de carga. Usa <img> para qualquer origem sem remotePatterns do Next. */
 export default function ProductThumb({ imagemUrl, size = 40, className = '' }: Props) {
   const [failed, setFailed] = useState(false)
   const u = resolveProductImageUrl(imagemUrl)
@@ -34,12 +33,12 @@ export default function ProductThumb({ imagemUrl, size = 40, className = '' }: P
   }
 
   return (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={u!}
       alt=""
       width={size}
       height={size}
-      unoptimized
       className={`rounded-lg object-cover bg-gray-100 ${className}`}
       style={{ width: size, height: size }}
       onError={() => setFailed(true)}
