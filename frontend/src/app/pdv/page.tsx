@@ -1,7 +1,6 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, Fragment, useState as useLocalState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PdvCupomThermal from '@/components/pdv/PdvCupomThermal'
 import PdvModalBuscaProduto from '@/components/pdv/PdvModalBuscaProduto'
 import PdvModalQuantidade from '@/components/pdv/PdvModalQuantidade'
 import PdvModalFechamentoCaixa from '@/components/pdv/PdvModalFechamentoCaixa'
@@ -13,13 +12,53 @@ import { getAuth, isAuthenticated } from '@/lib/auth'
 import { appAlert, appConfirm } from '@/lib/dialogs'
 import { authService } from '@/services/authService'
 import { printThermalReceipt } from '@/lib/printThermalReceipt'
+import { calcularPrecoEfetivo, precoUnitarioEfetivo } from '@/lib/precoEfetivo'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
+type SideButtonProps = {
+  fKey: string
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  variant?: 'default' | 'danger' | 'success' | 'warn'
+}
+
+function SideButton({ fKey, label, onClick, disabled, variant = 'default' }: SideButtonProps) {
+  const variantClass = {
+    default: 'bg-primary-800/60 hover:bg-primary-700/80 border-primary-600/40 text-primary-100 hover:text-white',
+    danger:  'bg-red-900/60 hover:bg-red-800/80 border-red-700/40 text-red-200 hover:text-white',
+    success: 'bg-emerald-800/60 hover:bg-emerald-700/80 border-emerald-600/40 text-emerald-100 hover:text-white',
+    warn:    'bg-amber-800/50 hover:bg-amber-700/70 border-amber-600/40 text-amber-100 hover:text-white',
+  }[variant]
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full flex flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-2 text-center transition-all disabled:pointer-events-none disabled:opacity-35 ${variantClass}`}
+    >
+      <span className="text-[10px] font-bold font-mono tracking-wider opacity-60">{fKey}</span>
+      <span className="text-[11px] font-semibold leading-tight">{label}</span>
+    </button>
+  )
+}
+
+// Ícones SVG inline para mobile — sem emoji
+function IconSearch() { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg> }
+function IconBox()    { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0v10l-8 4m0-14L4 7m8 4v10" /></svg> }
+function IconCheck()  { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> }
+function IconUser()   { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" /></svg> }
+function IconPlus()   { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
+function IconClose()  { return <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> }
+
 export default function PdvPage() {
   const router = useRouter()
+  const [showPedido, setShowPedido] = useLocalState(false)
+
   const {
     searchInputRef,
     pedidoInputRef,
@@ -110,9 +149,7 @@ export default function PdvPage() {
 
   useEffect(() => {
     const r = getAuth()?.role
-    if (r === 'TOTEM') {
-      router.replace('/totem')
-    }
+    if (r === 'TOTEM') router.replace('/totem')
   }, [router])
 
   function sairDoPdv() {
@@ -126,10 +163,7 @@ export default function PdvPage() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push('/login')
-      return
-    }
+    if (!isAuthenticated()) { router.push('/login'); return }
     ;(async () => {
       try {
         await loadBasics()
@@ -148,50 +182,26 @@ export default function PdvPage() {
       const u = uiRef.current
 
       if (key === 'Escape' || keyCode === 27) {
-        e.preventDefault()
-        e.stopPropagation()
-        if (u.showPagamentoModal) {
-          setShowPagamentoModal(false)
-          return
-        }
-        if (u.showBuscaProduto) {
-          setShowBuscaProduto(false)
-          return
-        }
-        if (u.showQtdModal) {
-          setShowQtdModal(false)
-          return
-        }
-        if (u.showFechamentoModal) {
-          setShowFechamentoModal(false)
-          return
-        }
-        if (u.showClienteModal) {
-          setShowClienteModal(false)
-          return
-        }
-        if (u.showUltimas) {
-          setShowUltimas(false)
-          return
-        }
-        if (getAuth()?.role === 'VENDEDOR' || getAuth()?.role === 'TOTEM') {
-          sairDoPdv()
-          return
-        }
+        e.preventDefault(); e.stopPropagation()
+        if (u.showPagamentoModal) { setShowPagamentoModal(false); return }
+        if (u.showBuscaProduto)   { setShowBuscaProduto(false);   return }
+        if (u.showQtdModal)       { setShowQtdModal(false);       return }
+        if (u.showFechamentoModal){ setShowFechamentoModal(false); return }
+        if (u.showClienteModal)   { setShowClienteModal(false);   return }
+        if (u.showUltimas)        { setShowUltimas(false);        return }
+        if (getAuth()?.role === 'VENDEDOR' || getAuth()?.role === 'TOTEM') { sairDoPdv(); return }
         if (await appConfirm('Deseja sair do PDV?', 'Sair do PDV')) sairDoPdv()
         return
       }
 
       if (e.altKey && (key === 'f' || key === 'F')) {
-        e.preventDefault()
-        e.stopPropagation()
+        e.preventDefault(); e.stopPropagation()
         setShowFechamentoModal(true)
         return
       }
 
       if (e.ctrlKey && keyCode === 68) {
-        e.preventDefault()
-        e.stopPropagation()
+        e.preventDefault(); e.stopPropagation()
         setShowPagamentoModal(true)
         window.setTimeout(() => cpfPagamentoRef.current?.focus(), 120)
         return
@@ -202,24 +212,18 @@ export default function PdvPage() {
 
       if ((key === 'p' || key === 'P') && !e.ctrlKey && !e.altKey) {
         if (!editable) {
-          e.preventDefault()
-          e.stopPropagation()
+          e.preventDefault(); e.stopPropagation()
           const lo = lastPrintedOrderRef.current
           const lx = lastPrintedExtrasRef.current
-          if (lo && lx) {
-            printThermalReceipt(lo, lx)
-          } else {
-            void appAlert('Nenhum cupom para reimprimir. Finalize uma venda primeiro.', 'Cupom')
-          }
+          if (lo && lx) { printThermalReceipt(lo, lx) }
+          else { void appAlert('Nenhum cupom para reimprimir. Finalize uma venda primeiro.', 'Cupom') }
         }
         return
       }
 
       const isFKey = /^F([1-9]|1[0-2])$/.test(key)
       if (!isFKey) return
-
-      e.preventDefault()
-      e.stopPropagation()
+      e.preventDefault(); e.stopPropagation()
 
       const notLivre = caixaStatus !== 'LIVRE'
       if (notLivre) {
@@ -228,183 +232,126 @@ export default function PdvPage() {
       }
 
       switch (key) {
-        case 'F2':
-          searchInputRef.current?.focus()
-          break
-        case 'F3':
-          pedidoInputRef.current?.focus()
-          break
-        case 'F4':
-          setShowQtdModal(true)
-          break
-        case 'F5':
-          novaVenda()
-          break
-        case 'F7':
-          void openUltimas()
-          break
-        case 'F8':
-          setShowBuscaProduto(true)
-          break
-        case 'F9':
-          void appAlert('Função "Alterar Venda (F9)" não implementada.', 'Função não disponível')
-          break
-        case 'F10':
-          if (cartLenRef.current > 0) setShowPagamentoModal(true)
-          break
-        case 'F11':
-          if (await appConfirm('Tem certeza que deseja cancelar esta venda?', 'Cancelar venda')) novaVenda()
-          break
-        case 'F12':
-          setShowClienteModal(true)
-          break
-        default:
-          break
+        case 'F2': searchInputRef.current?.focus(); break
+        case 'F3': setShowPedido(true); window.setTimeout(() => pedidoInputRef.current?.focus(), 80); break
+        case 'F4': setShowQtdModal(true); break
+        case 'F5': novaVenda(); break
+        case 'F7': void openUltimas(); break
+        case 'F8': setShowBuscaProduto(true); break
+        case 'F9': void appAlert('Função "Alterar Venda (F9)" não implementada.', 'Função não disponível'); break
+        case 'F10': if (cartLenRef.current > 0) setShowPagamentoModal(true); break
+        case 'F11': if (await appConfirm('Tem certeza que deseja cancelar esta venda?', 'Cancelar venda')) novaVenda(); break
+        case 'F12': setShowClienteModal(true); break
+        default: break
       }
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-    // openUltimas / novaVenda: funções estáveis na prática para atalhos globais
     // eslint-disable-next-line react-hooks/exhaustive-deps -- atalhos PDV
   }, [router, caixaStatus])
 
   const empresaSigla = nomeEmpresa
-    .split(' ')
-    .slice(0, 2)
-    .map(part => part[0] || '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+    .split(' ').slice(0, 2).map(p => p[0] || '').join('').toUpperCase().slice(0, 2)
 
-  const fieldClass =
-    'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 sm:py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 min-h-[44px] sm:min-h-0'
-  const labelClass = 'block text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1'
+  const caixaBadgeClass =
+    caixaStatus === 'LIVRE'   ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/30' :
+    caixaStatus === 'PAUSADO' ? 'bg-amber-400/20 text-amber-200 border-amber-400/30' :
+                                'bg-red-400/20 text-red-200 border-red-400/30'
 
-  const pdvShortcutRowClass = 'flex flex-wrap items-center justify-center gap-x-2 gap-y-2'
-  const pdvShortcutChipClass =
-    'inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm shadow-slate-900/[0.06] ring-1 ring-slate-900/[0.03]'
-  const pdvKbdClass =
-    'rounded-md border border-slate-200/90 bg-gradient-to-b from-slate-50 to-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wide text-slate-800 tabular-nums'
-
-  function PdvShortcut({ keys, label }: { keys: string; label: string }) {
-    return (
-      <span className={pdvShortcutChipClass}>
-        <kbd className={pdvKbdClass}>{keys}</kbd>
-        {label}
-      </span>
-    )
-  }
+  const caixaLabel =
+    caixaStatus === 'LIVRE' ? 'Livre' : caixaStatus === 'PAUSADO' ? 'Pausado' : 'Fechado'
 
   return (
     <AppLayout title="PDV — Ponto de Venda" standalonePdv>
-      <div className="flex flex-col flex-1 min-h-0 h-full bg-gray-50 overflow-hidden pb-[env(safe-area-inset-bottom)]">
-        {/* Saída discreta para o ERP (sem menu lateral nesta tela) */}
-        <div className="shrink-0 flex items-center justify-between gap-2 border-b border-gray-200/90 bg-white/90 px-3 py-2 backdrop-blur-sm sm:px-4">
-          <button
-            type="button"
-            onClick={sairDoPdv}
-            className="inline-flex items-center gap-2 rounded-full border border-primary-200/80 bg-primary-50/80 px-3 py-1.5 text-sm font-semibold text-primary-800 shadow-sm transition-all hover:-translate-y-[1px] hover:bg-primary-100/80 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-          >
-            <span aria-hidden className="text-base leading-none">←</span>
-            <span>Painel</span>
-          </button>
-          <div className="inline-flex items-center gap-2 rounded-full border border-gray-200/90 bg-white px-2 py-1 shadow-sm">
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-primary-100 to-primary-50 ring-1 ring-primary-200/80">
+      <div className="flex flex-col h-full min-h-0 bg-gray-100 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+
+        {/* ── HEADER ────────────────────────────────────────────────────── */}
+        <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-gradient-to-r from-primary-800 via-primary-700 to-primary-900 text-white shadow-lg">
+          {/* Logo + empresa */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/15 ring-1 ring-white/20">
               {logoEmpresaUrl && !logoFalhou ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoEmpresaUrl}
-                  alt={`Logo ${nomeEmpresa}`}
-                  className="h-full w-full object-contain bg-white"
-                  onError={() => setLogoFalhou(true)}
-                />
+                <img src={logoEmpresaUrl} alt="" className="h-full w-full object-contain bg-white" onError={() => setLogoFalhou(true)} />
               ) : (
-                <span className="text-[11px] font-bold tracking-wide text-primary-800">{empresaSigla || 'PDV'}</span>
+                <span className="text-[11px] font-black text-white">{empresaSigla || 'VX'}</span>
               )}
             </div>
-            <div className="hidden sm:flex flex-col leading-tight">
-              <span className="max-w-[180px] truncate text-[11px] font-semibold text-gray-700">{nomeEmpresa}</span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-gray-400">PDV</span>
+            <span className="hidden sm:block max-w-[160px] truncate text-[12px] font-bold text-white">{nomeEmpresa}</span>
+          </div>
+
+          {/* Centro: operador + terminal */}
+          <div className="flex items-center gap-2 text-[11px] text-white/60 min-w-0">
+            <span className="hidden md:inline font-mono text-white/50 shrink-0">PDV-{terminalCodigo}</span>
+            <span className="hidden md:inline text-white/30 shrink-0" aria-hidden>·</span>
+            <span className="truncate max-w-[120px] sm:max-w-none"><span className="font-semibold text-white/80">{authUser?.name ?? '—'}</span></span>
+          </div>
+
+          {/* Status + sair */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={cycleCaixaStatus}
+              title="Clique para alternar status do caixa"
+              className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-all ${caixaBadgeClass}`}
+            >
+              {caixaLabel}
+            </button>
+            <button
+              type="button"
+              onClick={sairDoPdv}
+              className="rounded-lg border border-white/20 bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:text-white transition"
+            >
+              ← Sair
+            </button>
+          </div>
+        </header>
+
+        {/* ── BODY ──────────────────────────────────────────────────────── */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+
+          {/* SIDEBAR — desktop */}
+          <aside className="hidden lg:flex shrink-0 w-[108px] flex-col gap-1.5 bg-gradient-to-b from-primary-900 to-primary-800 border-r border-primary-950/50 px-2 py-3 overflow-y-auto">
+            <SideButton fKey="F2" label="Buscar" onClick={() => searchInputRef.current?.focus()} />
+            <SideButton fKey="F4" label="Qtd" onClick={() => setShowQtdModal(true)} disabled={caixaStatus !== 'LIVRE'} />
+            <SideButton fKey="F5" label="Nova Venda" onClick={() => novaVenda()} variant="success" />
+            <SideButton fKey="F7" label="Últimas" onClick={() => void openUltimas()} disabled={caixaStatus !== 'LIVRE'} />
+            <SideButton fKey="F8" label="Pesq. Prod." onClick={() => setShowBuscaProduto(true)} disabled={caixaStatus !== 'LIVRE'} />
+            <div className="my-1 border-t border-white/10" />
+            <SideButton fKey="F12" label="Cliente" onClick={() => setShowClienteModal(true)} disabled={caixaStatus !== 'LIVRE'} />
+            <SideButton fKey="Alt+F" label="Caixa" onClick={() => setShowFechamentoModal(true)} variant="warn" />
+            <div className="my-1 border-t border-white/10" />
+            <SideButton fKey="F11" label="Cancelar" onClick={async () => { if (await appConfirm('Cancelar esta venda?', 'Cancelar venda')) novaVenda() }} variant="danger" disabled={cart.length === 0} />
+            <SideButton fKey="F10" label="Finalizar" onClick={() => cart.length > 0 && setShowPagamentoModal(true)} variant="success" disabled={cart.length === 0 || finishing} />
+            <div className="mt-auto pt-2">
+              <SideButton fKey="Esc" label="Sair" onClick={sairDoPdv} variant="danger" />
             </div>
-          </div>
-        </div>
+          </aside>
 
-        {/* Barra superior PDV (layout sistema-cadastro) */}
-        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-700 via-primary-700 to-primary-900 text-white shadow-sm">
-          <button
-            type="button"
-            onClick={cycleCaixaStatus}
-            className={`self-start sm:self-auto rounded-lg px-3 py-1.5 text-sm font-bold tracking-wider uppercase transition-colors ${
-              caixaStatus === 'LIVRE'
-                ? 'bg-emerald-400/25 hover:bg-emerald-400/35'
-                : caixaStatus === 'PAUSADO'
-                  ? 'bg-amber-500/90 hover:bg-amber-400'
-                  : 'bg-rose-600/90 hover:bg-rose-500'
-            }`}
-            title="Livre → Pausado → Fechado → Livre"
-          >
-            {caixaStatus === 'LIVRE' ? 'Caixa livre' : caixaStatus === 'PAUSADO' ? 'Caixa pausado' : 'Caixa fechado'}
-          </button>
-          <div className="text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span title="Terminal PDV">
-              PDV-<b className="font-numeric tabular-nums font-semibold">{terminalCodigo}</b>
-            </span>
-            <span className="text-white/60" aria-hidden>
-              ·
-            </span>
-            <span>
-              Operador: <b>{authUser?.name ?? '—'}</b>
-            </span>
-          </div>
-        </div>
+          {/* ÁREA PRINCIPAL */}
+          <main className="flex flex-1 min-h-0 min-w-0 flex-col">
 
-        {/* Faixa total — mobile/tablet (como sistema-cadastro) */}
-        <div
-          className="shrink-0 lg:hidden px-4 py-2.5 bg-gradient-to-r from-slate-900 to-slate-800 text-slate-50 border-b border-white/10"
-          aria-label="Resumo da venda"
-        >
-          <div className="flex items-center justify-between gap-3 max-w-6xl mx-auto">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Total da venda</span>
-            <strong className="text-xl font-extrabold font-numeric tabular-nums text-emerald-400">{fmt(total)}</strong>
-          </div>
-        </div>
-
-        <div className="flex flex-1 min-h-0 flex-col lg:flex-row gap-3 p-3 sm:p-4 w-full max-w-[100vw] box-border overflow-y-auto lg:overflow-hidden">
-          {/* Coluna esquerda: comandos (pdv-left) */}
-          <section className="order-2 lg:order-1 flex flex-col w-full lg:w-[35%] lg:min-w-[300px] lg:max-w-[440px] shrink-0 rounded-xl border border-gray-100 bg-white shadow-sm min-h-0 overflow-hidden lg:max-h-full">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
-            <div className="px-4 pt-4 pb-2 border-b border-gray-100">
-              <p className="text-xs font-semibold text-primary-700 truncate">{nomeEmpresa}</p>
-            </div>
-
-            {clienteId && (
-              <div className="mx-4 mt-3 rounded-xl border border-primary-200 bg-primary-50/60 px-3 py-2 text-sm">
-                <p className="text-[10px] font-bold uppercase text-primary-800 mb-1">Cliente na nota</p>
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-gray-900 font-medium truncate">{clienteBusca || `Cliente #${clienteId}`}</span>
-                  <button
-                    type="button"
-                    className="shrink-0 text-gray-500 hover:text-red-600 px-1"
-                    title="Remover cliente"
-                    onClick={() => {
-                      setClienteId(undefined)
-                      setClienteBusca('')
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
+            {/* Banner de sucesso (aparece apenas após finalizar) */}
+            {success && (
+              <div className="shrink-0 flex items-center justify-center gap-2 bg-emerald-600 text-white text-sm font-semibold px-4 py-2 shadow-sm">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Venda finalizada com sucesso!
               </div>
             )}
 
-            <div className="p-4 space-y-3 sm:space-y-4 border-b border-gray-100">
-              <div>
-                <label className={labelClass} htmlFor="pdv-search">
-                  Código de barras / busca
-                </label>
+            {/* Barra de busca */}
+            <div className="shrink-0 bg-white border-b border-gray-200 px-3 py-3 sm:px-4 shadow-sm">
+              {/* Linha 1: input de busca (full width em mobile) */}
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none select-none" aria-hidden>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                </span>
                 <input
                   ref={searchInputRef}
-                  id="pdv-search"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   onKeyDown={e => {
@@ -413,343 +360,291 @@ export default function PdvPage() {
                       addToCart(selectedProduct, lineQty)
                     }
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-base shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/35 min-h-[48px]"
-                  placeholder="Bipar ou digitar produto…"
+                  className="w-full rounded-lg border-2 border-primary-400/50 bg-white pl-9 pr-4 py-2.5 text-base font-medium shadow-sm placeholder:text-gray-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                  placeholder="Código de barras ou nome do produto…"
                   autoFocus
                   autoComplete="off"
                   autoCorrect="off"
                 />
               </div>
 
-              <h2 className="text-sm font-bold text-primary-700 leading-tight line-clamp-2 break-words">
-                {heroName}
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-2 sm:items-end">
-                <label className="flex flex-col gap-1 min-w-0">
-                  <span className="text-[10px] font-semibold uppercase text-gray-500">Qtd</span>
-                  <div className="flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <button
-                      type="button"
-                      className="h-11 w-10 shrink-0 border-r border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-                      disabled={!selectedProduct || lineQty <= 1}
-                      onClick={() => {
-                        const qty = Math.max(1, Math.floor(Number(lineQty) || 1) - 1)
-                        setLineQty(qty)
-                        if (selectedProduct && cart.some(i => i.product.id === selectedProduct.id)) {
-                          updateQty(selectedProduct.id, qty)
-                        }
-                      }}
-                    >
-                      −
-                    </button>
-                    <div
-                      id="pdv-qtd"
-                      className="w-full min-w-0 px-2 py-2.5 text-center text-base font-semibold font-numeric tabular-nums select-none"
-                      aria-live="polite"
-                    >
-                      {Math.max(1, Math.floor(Number(lineQty) || 1))}
-                    </div>
-                    <button
-                      type="button"
-                      className="h-11 w-10 shrink-0 border-l border-gray-200 text-lg font-bold text-primary-700 hover:bg-primary-50 disabled:opacity-40"
-                      disabled={!selectedProduct}
-                      onClick={() => {
-                        const qty = Math.max(1, Math.floor(Number(lineQty) || 1) + 1)
-                        setLineQty(qty)
-                        if (selectedProduct && cart.some(i => i.product.id === selectedProduct.id)) {
-                          updateQty(selectedProduct.id, qty)
-                        }
-                      }}
-                    >
-                      +
-                    </button>
+              {/* Linha 2: Qtd + Incluir */}
+              <div className="flex gap-2 items-center mt-2">
+                {/* Qtd */}
+                <div className="flex items-center shrink-0 rounded-lg border-2 border-gray-200 bg-white overflow-hidden h-11">
+                  <button
+                    type="button"
+                    className="h-full w-10 border-r border-gray-200 text-xl font-bold text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                    disabled={!selectedProduct || lineQty <= 1}
+                    onClick={() => {
+                      const qty = Math.max(1, Math.floor(Number(lineQty) || 1) - 1)
+                      setLineQty(qty)
+                      if (selectedProduct && cart.some(i => i.product.id === selectedProduct.id)) updateQty(selectedProduct.id, qty)
+                    }}
+                    aria-label="Diminuir quantidade"
+                  >−</button>
+                  <div className="w-12 text-center text-base font-bold font-mono tabular-nums select-none" aria-live="polite">
+                    {Math.max(1, Math.floor(Number(lineQty) || 1))}
                   </div>
-                </label>
-                <div className="rounded-xl border border-primary-200 bg-primary-50/60 px-3 py-2.5">
-                  <p className="text-[10px] font-bold uppercase text-primary-800">Prévia do item</p>
-                  <p className="text-sm font-bold font-numeric tabular-nums text-primary-800 mt-0.5">
-                    {selectedProduct ? fmt(totalLinhaPreview) : '—'}
-                  </p>
+                  <button
+                    type="button"
+                    className="h-full w-10 border-l border-gray-200 text-xl font-bold text-primary-600 hover:bg-primary-50 disabled:opacity-40"
+                    disabled={!selectedProduct}
+                    onClick={() => {
+                      const qty = Math.max(1, Math.floor(Number(lineQty) || 1) + 1)
+                      setLineQty(qty)
+                      if (selectedProduct && cart.some(i => i.product.id === selectedProduct.id)) updateQty(selectedProduct.id, qty)
+                    }}
+                    aria-label="Aumentar quantidade"
+                  >+</button>
                 </div>
-              </div>
-            </div>
 
-            {farmacia && (
-              <div className="px-4 pb-3">
+                {/* Incluir (Enter) */}
                 <button
                   type="button"
-                  onClick={() => setShowFarmLines(!showFarmLines)}
-                  className="text-xs sm:text-sm text-amber-800 font-medium"
+                  onClick={() => selectedProduct && addToCart(selectedProduct, lineQty)}
+                  disabled={!selectedProduct || caixaStatus !== 'LIVRE'}
+                  className="flex-1 sm:flex-none sm:w-auto rounded-lg border-2 border-primary-600 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 h-11 px-4 text-sm font-bold text-white transition shadow-sm shadow-primary-600/20"
                 >
+                  Incluir (Enter)
+                </button>
+              </div>
+
+              {/* Produto encontrado — só mostra quando há algo */}
+              {selectedProduct && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-800 truncate">{selectedProduct.name}</span>
+                  <span className="shrink-0 rounded-md bg-primary-50 border border-primary-200 px-2 py-0.5 text-[11px] font-bold text-primary-700 tabular-nums font-mono">
+                    {fmt(totalLinhaPreview)}
+                  </span>
+                </div>
+              )}
+
+              {/* Cliente vinculado */}
+              {clienteId && (
+                <div className="mt-2 flex items-center gap-1.5 w-fit rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-semibold text-primary-800">
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" /></svg>
+                  <span className="max-w-[180px] truncate">{clienteBusca || `Cliente #${clienteId}`}</span>
+                  <button type="button" className="ml-1 text-primary-400 hover:text-red-600" onClick={() => { setClienteId(undefined); setClienteBusca('') }}>✕</button>
+                </div>
+              )}
+
+              {farmacia && (
+                <button type="button" onClick={() => setShowFarmLines(!showFarmLines)} className="mt-2 text-[11px] text-amber-700 font-medium">
                   {showFarmLines ? '▼' : '▶'} Lote / validade por item
                 </button>
-              </div>
-            )}
+              )}
             </div>
 
-            {/* Rodapé fixo: total + finalizar (pagamento no modal, como sistema-cadastro) */}
-            <div className="shrink-0 border-t border-gray-200 bg-white/95 backdrop-blur-md px-3 py-3 shadow-[0_-8px_28px_-10px_rgba(15,23,42,0.15)] space-y-2">
-              <div>
-                <label className={labelClass} htmlFor="pdv-pedido">
-                  Pedido (opcional)
-                </label>
-                <input
-                  ref={pedidoInputRef}
-                  id="pdv-pedido"
-                  value={pedidoCodigo}
-                  onChange={e => setPedidoCodigo(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                  placeholder="Código ou número"
-                  autoComplete="off"
-                />
+            {/* Tabela de itens — sem coluna CÓD e sem coluna IT */}
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white mx-3 mt-3 mb-0 rounded-t-xl border border-gray-200 shadow-sm">
+              <div className="shrink-0 grid grid-cols-[1fr_3.5rem_5.5rem_2.5rem] gap-x-3 items-center bg-gradient-to-r from-primary-700 to-primary-900 px-4 py-2.5 rounded-t-xl">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Descrição</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70 text-right">Qtd</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70 text-right">Total</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70 text-center">–</span>
               </div>
-              {success && (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm px-2.5 py-1.5 text-center font-medium">
-                  Venda finalizada com sucesso!
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {loading ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Carregando…</div>
+                ) : cart.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[10rem] text-center px-4 py-10">
+                    <svg className="h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 14H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3m3 14h7a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-7m-3 10V6m0 8H6" />
+                    </svg>
+                    <p className="mt-3 text-sm font-semibold text-gray-400">Nenhum item na venda</p>
+                    <p className="mt-1 text-xs text-gray-400">Bipe ou pesquise um produto acima.</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {cart.map((item, idx) => {
+                      const lineTot   = calcularPrecoEfetivo(item.product, item.quantity)
+                      const unitPrice = precoUnitarioEfetivo(item.product)
+                      return (
+                        <Fragment key={item.product.id}>
+                          <li className="grid grid-cols-[1fr_3.5rem_5.5rem_2.5rem] gap-x-3 items-center px-4 py-3 text-sm hover:bg-primary-50/40 transition-colors">
+                            <div className="min-w-0">
+                              <span className="font-semibold text-gray-800 truncate block" title={item.product.name}>{item.product.name}</span>
+                              <span className="text-[11px] text-gray-400 tabular-nums">
+                                {idx + 1} · {fmt(unitPrice)} / un
+                              </span>
+                            </div>
+                            <span className="text-right tabular-nums font-mono font-semibold text-gray-700">{item.quantity}</span>
+                            <span className="text-right tabular-nums font-bold text-primary-700">{fmt(lineTot)}</span>
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => updateQty(item.product.id, 0)}
+                                className="h-7 w-7 flex items-center justify-center rounded border border-gray-200 bg-white text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition"
+                                title="Remover item"
+                                aria-label="Remover item"
+                              >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          </li>
+                          {farmacia && showFarmLines && (
+                            <li className="bg-amber-50/80 border-b border-amber-100 px-5 py-2">
+                              <div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-amber-900">
+                                <span className="font-medium">Lote / validade:</span>
+                                <input className="w-28 rounded border border-amber-200 bg-white px-2 py-1 text-[0.7rem] shadow-sm focus:outline-none" placeholder="Lote" value={item.loteCodigo ?? ''} onChange={e => setCartLote(item.product.id, 'loteCodigo', e.target.value)} />
+                                <input type="date" className="rounded border border-amber-200 bg-white px-2 py-1 text-[0.7rem] shadow-sm focus:outline-none" value={item.loteValidade?.slice(0, 10) ?? ''} onChange={e => setCartLote(item.product.id, 'loteValidade', e.target.value)} />
+                              </div>
+                            </li>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Rodapé: totais + ações */}
+            <div className="shrink-0 bg-white mx-3 mb-3 rounded-b-xl border border-t-0 border-gray-200 shadow-sm">
+              {/* Totais */}
+              <div className="px-4 pt-3 pb-2 space-y-1">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span className="tabular-nums font-mono text-gray-700">{fmt(subtotalCart)}</span>
+                </div>
+                {descontoNum > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-amber-600">Desconto</span>
+                    <span className="tabular-nums font-mono text-amber-600">− {fmt(descontoNum)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-gray-200 pt-2 mt-1">
+                  <span className="text-xs font-black uppercase tracking-widest text-gray-500">Total</span>
+                  <span className="text-2xl font-black tabular-nums font-mono text-primary-700">{fmt(total)}</span>
+                </div>
+              </div>
+
+              {/* Campo pedido — colapsável */}
+              {showPedido && (
+                <div className="px-4 pb-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1" htmlFor="pdv-pedido">
+                    Pedido (F3)
+                  </label>
+                  <input
+                    ref={pedidoInputRef}
+                    id="pdv-pedido"
+                    value={pedidoCodigo}
+                    onChange={e => setPedidoCodigo(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    placeholder="Código ou número do pedido"
+                    autoComplete="off"
+                  />
                 </div>
               )}
-              <div className="flex justify-between items-baseline gap-2 pt-0.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total</span>
-                <span className="text-xl sm:text-2xl font-bold font-numeric tabular-nums text-primary-700 leading-none">
-                  {fmt(total)}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => cart.length > 0 && setShowPagamentoModal(true)}
-                disabled={cart.length === 0 || finishing}
-                className="btn-primary w-full text-sm sm:text-base py-3 min-h-[48px] rounded-xl font-semibold shadow-md shadow-primary-600/15"
-              >
-                {finishing ? 'Finalizando…' : 'Finalizar venda (F10)'}
-              </button>
-              {cart.length > 0 && (
+
+              {/* Botões de ação */}
+              <div className="px-3 sm:px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
+                {/* Linha 1 (mobile): Finalizar em destaque */}
                 <button
                   type="button"
-                  onClick={limparCarrinho}
-                  className="w-full rounded-xl border border-gray-200 bg-white py-2 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={() => cart.length > 0 && setShowPagamentoModal(true)}
+                  disabled={cart.length === 0 || finishing}
+                  className="btn-primary w-full rounded-lg py-3 text-base font-bold shadow-md shadow-primary-600/15 disabled:opacity-40"
                 >
-                  Limpar carrinho
+                  {finishing ? 'Finalizando…' : 'F10 — Finalizar venda'}
                 </button>
-              )}
-            </div>
-          </section>
 
-          {/* Coluna direita: cupom térmico (pdv-right) */}
-          <section className="order-1 lg:order-2 flex-1 flex flex-col min-w-0 min-h-[min(320px,45vh)] lg:min-h-0 lg:h-full">
-            <PdvCupomThermal
-              nomeEmpresa={nomeEmpresa}
-              cart={cart}
-              subtotal={subtotalCart}
-              desconto={descontoNum}
-              total={total}
-              loading={loading}
-              farmacia={farmacia}
-              showFarmLines={showFarmLines}
-              onRemoveLine={id => updateQty(id, 0)}
-              setCartLote={setCartLote}
-            />
-          </section>
+                {/* Linha 2: ações secundárias */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPedido(v => !v)}
+                    title="Vincular pedido (F3)"
+                    className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 transition"
+                  >
+                    Pedido
+                  </button>
+                  {cart.length > 0 && (
+                    <button type="button" onClick={limparCarrinho} className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 transition">
+                      Limpar carrinho
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => { if (await appConfirm('Cancelar esta venda?', 'Cancelar venda')) novaVenda() }}
+                    disabled={cart.length === 0}
+                    className="ml-auto rounded-lg border border-red-200 bg-red-50 hover:bg-red-500 hover:border-red-500 hover:text-white px-3 py-2 text-xs font-bold text-red-600 transition disabled:opacity-40"
+                  >
+                    F11 Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </main>
         </div>
 
-        {/* Ações rápidas mobile (layout sistema-cadastro) */}
+        {/* ── MOBILE: barra de ações ─────────────────────────────────────── */}
         <div
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 grid grid-cols-3 gap-2 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-100 border-t border-slate-200 shadow-[0_-6px_24px_rgba(15,23,42,0.1)]"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 grid grid-cols-3 gap-1 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-gradient-to-b from-primary-800 to-primary-900 border-t border-primary-950/40"
           aria-label="Ações rápidas"
         >
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => searchInputRef.current?.focus()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              📷
-            </span>
-            <span>Código</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => searchInputRef.current?.focus()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              📦
-            </span>
-            <span>Produtos</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-primary-200 bg-gradient-to-b from-primary-600 to-primary-700 text-primary-50 text-[0.72rem] font-bold shadow-sm active:scale-[0.98]"
-            onClick={() => cart.length > 0 && setShowPagamentoModal(true)}
-            disabled={cart.length === 0 || finishing}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              ✅
-            </span>
-            <span>Finalizar</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => document.getElementById('pdv-pedido')?.focus()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              📋
-            </span>
-            <span>Pedido</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => setShowClienteModal(true)}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              👤
-            </span>
-            <span>Cliente</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => document.getElementById('pdv-qtd')?.focus()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              🔢
-            </span>
-            <span>Qtd</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => novaVenda()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              🆕
-            </span>
-            <span>Nova venda</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-300 bg-white text-[0.72rem] font-bold text-slate-900 shadow-sm active:scale-[0.98]"
-            onClick={() => void openUltimas()}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              🔍
-            </span>
-            <span>Vendas</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-col items-center justify-center gap-1 min-h-[52px] rounded-xl border border-slate-400 bg-slate-100 text-[0.72rem] font-bold text-slate-800 shadow-sm active:scale-[0.98]"
-            onClick={() => setShowFechamentoModal(true)}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              🏁
-            </span>
-            <span>Caixa</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-row items-center justify-center gap-2 min-h-[48px] rounded-xl border border-rose-200 bg-rose-50 text-[0.72rem] font-bold text-rose-900 col-span-3"
-            onClick={sairDoPdv}
-          >
-            <span aria-hidden>🚪</span>
-            <span>Sair</span>
-            <span className="text-[0.65rem] opacity-80 font-extrabold uppercase">Esc</span>
-          </button>
+          {[
+            { icon: <IconSearch />, label: 'Buscar', onClick: () => searchInputRef.current?.focus(), cls: 'bg-primary-700/60 border-white/10 text-primary-100' },
+            { icon: <IconBox />,    label: 'Produtos', onClick: () => setShowBuscaProduto(true), cls: 'bg-primary-700/60 border-white/10 text-primary-100' },
+            { icon: <IconCheck />,  label: 'Finalizar', onClick: () => cart.length > 0 && setShowPagamentoModal(true), cls: 'bg-emerald-600/90 border-emerald-500/40 text-white', disabled: cart.length === 0 || finishing },
+            { icon: <IconUser />,   label: 'Cliente', onClick: () => setShowClienteModal(true), cls: 'bg-primary-700/60 border-white/10 text-primary-100' },
+            { icon: <IconPlus />,   label: 'Nova venda', onClick: () => novaVenda(), cls: 'bg-primary-700/60 border-white/10 text-primary-100' },
+            { icon: <IconClose />,  label: 'Sair', onClick: sairDoPdv, cls: 'bg-red-800/70 border-red-600/30 text-red-200' },
+          ].map(({ icon, label, onClick, cls, disabled }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={onClick}
+              disabled={disabled}
+              className={`flex flex-col items-center justify-center gap-1 min-h-[50px] rounded-lg border text-[0.68rem] font-semibold active:scale-[0.97] transition disabled:opacity-40 ${cls}`}
+            >
+              {icon}
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Espaço para não cobrir conteúdo com a barra fixa (mobile) */}
-        <div className="shrink-0 lg:hidden h-[calc(180px+env(safe-area-inset-bottom))]" aria-hidden />
+        <div className="shrink-0 lg:hidden h-[calc(136px+env(safe-area-inset-bottom))]" aria-hidden />
 
-        {/* Rodapé atalhos — desktop */}
-        <footer
-          className="hidden lg:block shrink-0 border-t border-slate-200/80 bg-gradient-to-b from-slate-50/95 to-white px-4 py-2.5 shadow-[0_-4px_18px_-8px_rgba(15,23,42,0.08)]"
-          aria-label="Atalhos do teclado"
-        >
-          <div className="mx-auto flex max-w-6xl flex-col gap-2">
-            <div className={pdvShortcutRowClass}>
-              <PdvShortcut keys="F7" label="Últimas vendas" />
-              <PdvShortcut keys="Enter" label="Incluir item" />
-              <PdvShortcut keys="F8" label="Pesq. produto" />
-              <PdvShortcut keys="F10" label="Finalizar" />
-            </div>
-            <div className={`${pdvShortcutRowClass} opacity-95`}>
-              <PdvShortcut keys="F2" label="Busca" />
-              <PdvShortcut keys="F3" label="Pedido" />
-              <PdvShortcut keys="F4" label="Qtd" />
-              <PdvShortcut keys="F5" label="Nova venda" />
-              <PdvShortcut keys="F11" label="Cancelar" />
-              <PdvShortcut keys="F12" label="Cliente" />
-              <PdvShortcut keys="Alt+F" label="Fechar caixa" />
-              <PdvShortcut keys="Ctrl+D" label="CPF" />
-              <PdvShortcut keys="P" label="Reimprimir cupom" />
-              <PdvShortcut keys="Esc" label="Sair" />
-            </div>
-          </div>
-        </footer>
       </div>
 
+      {/* ── MODAIS ────────────────────────────────────────────────────────── */}
       <PdvPagamentoModal
         open={showPagamentoModal}
         onClose={() => setShowPagamentoModal(false)}
-        forma={forma}
-        setForma={setForma}
-        parcelas={parcelas}
-        setParcelas={setParcelas}
-        chavePix={chavePix}
-        setChavePix={setChavePix}
-        desconto={desconto}
-        setDesconto={setDesconto}
-        cpfCliente={cpfCliente}
-        setCpfCliente={setCpfCliente}
-        clienteBusca={clienteBusca}
-        setClienteBusca={setClienteBusca}
+        forma={forma} setForma={setForma}
+        parcelas={parcelas} setParcelas={setParcelas}
+        chavePix={chavePix} setChavePix={setChavePix}
+        desconto={desconto} setDesconto={setDesconto}
+        cpfCliente={cpfCliente} setCpfCliente={setCpfCliente}
+        clienteBusca={clienteBusca} setClienteBusca={setClienteBusca}
         clientesOpts={clientesOpts}
         onBuscarClientes={() => void buscarClientes()}
-        onSelectCliente={c => {
-          setClienteId(c.id)
-          setClienteBusca(c.nome)
-          setClientesOpts([])
-        }}
-        farmacia={farmacia}
-        fastFood={fastFood}
-        showFarmLines={showFarmLines}
-        setShowFarmLines={setShowFarmLines}
-        subtotalCart={subtotalCart}
-        descontoNum={descontoNum}
-        total={total}
-        pixQrDataUrl={pixQrDataUrl}
-        pixQrError={pixQrError}
-        pixPayload={pixPayload}
-        finishing={finishing}
-        cartLength={cart.length}
+        onSelectCliente={c => { setClienteId(c.id); setClienteBusca(c.nome); setClientesOpts([]) }}
+        farmacia={farmacia} fastFood={fastFood}
+        showFarmLines={showFarmLines} setShowFarmLines={setShowFarmLines}
+        subtotalCart={subtotalCart} descontoNum={descontoNum} total={total}
+        pixQrDataUrl={pixQrDataUrl} pixQrError={pixQrError} pixPayload={pixPayload}
+        finishing={finishing} cartLength={cart.length}
         onFinalize={() => void finalize()}
         cpfPagamentoRef={cpfPagamentoRef}
         clienteModalInputRef={clienteModalInputRef}
       />
 
       {showUltimas && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowUltimas(false)}
-        >
-          <div
-            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[min(90dvh,720px)] overflow-hidden flex flex-col ring-1 ring-gray-200 mx-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex justify-between items-center gap-2 bg-gray-50/80">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">Últimas vendas</h3>
-              <button
-                type="button"
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-                onClick={() => setShowUltimas(false)}
-              >
-                &times;
-              </button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowUltimas(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[min(90dvh,720px)] overflow-hidden flex flex-col ring-1 ring-gray-200" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-primary-700 to-primary-900">
+              <h3 className="text-base font-bold text-white">Últimas vendas</h3>
+              <button type="button" className="text-white/60 hover:text-white text-xl leading-none" onClick={() => setShowUltimas(false)}>&times;</button>
             </div>
-            <div className="overflow-y-auto overflow-x-auto p-3 sm:p-4">
-              <table className="w-full text-xs sm:text-sm min-w-[320px]">
+            <div className="overflow-y-auto overflow-x-auto p-4">
+              <table className="w-full text-sm min-w-[320px]">
                 <thead>
                   <tr className="text-left text-gray-500 border-b border-gray-200">
                     <th className="pb-2 font-semibold">#</th>
@@ -761,10 +656,10 @@ export default function PdvPage() {
                 <tbody className="divide-y divide-gray-100">
                   {ultimas.map(o => (
                     <tr key={o.id} className="hover:bg-gray-50">
-                      <td className="py-2 font-mono">{o.id}</td>
-                      <td className="py-2 whitespace-nowrap">{new Date(o.createdAt).toLocaleString('pt-BR')}</td>
-                      <td className="py-2 font-numeric tabular-nums">{fmt(o.total)}</td>
-                      <td className="py-2">{o.formaPagamento || '—'}</td>
+                      <td className="py-2 font-mono text-gray-600">{o.id}</td>
+                      <td className="py-2 whitespace-nowrap text-gray-600">{new Date(o.createdAt).toLocaleString('pt-BR')}</td>
+                      <td className="py-2 font-bold tabular-nums text-primary-700">{fmt(o.total)}</td>
+                      <td className="py-2 text-gray-600">{o.formaPagamento || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -779,10 +674,7 @@ export default function PdvPage() {
         onClose={() => setShowBuscaProduto(false)}
         products={products}
         loading={loading}
-        onPick={p => {
-          setSelectedProduct(p)
-          addToCart(p, lineQty)
-        }}
+        onPick={p => { setSelectedProduct(p); addToCart(p, lineQty) }}
       />
 
       <PdvModalQuantidade
@@ -805,11 +697,7 @@ export default function PdvPage() {
         setClienteBusca={setClienteBusca}
         clientesOpts={clientesOpts}
         onBuscar={() => void buscarClientes()}
-        onSelect={c => {
-          setClienteId(c.id)
-          setClienteBusca(c.nome)
-          setClientesOpts([])
-        }}
+        onSelect={c => { setClienteId(c.id); setClienteBusca(c.nome); setClientesOpts([]) }}
         onCreate={handleClienteCreate}
       />
     </AppLayout>
