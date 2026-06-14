@@ -12,7 +12,12 @@ export interface Product {
   imagemUrl?: string | null
   price: number
   precoPromocional?: number | null
+  promocaoInicio?: string | null
+  promocaoFim?: string | null
   emPromocao?: boolean
+  promoQtdLevar?: number | null
+  promoQtdPagar?: number | null
+  precoEfetivo?: number | null
   estoqueMinimo?: number
   stock: number
   active: boolean
