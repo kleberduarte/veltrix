@@ -1,7 +1,13 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BACKEND_URL = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+function backendBaseUrl(): string {
+  const raw = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').trim()
+  const noTrail = raw.replace(/\/$/, '')
+  if (/^https?:\/\//i.test(noTrail)) return noTrail
+  if (/^(localhost|127\.0\.0\.1)/i.test(noTrail)) return `http://${noTrail}`
+  return `https://${noTrail.replace(/^\/+/, '')}`
+}
 
 // Endpoints de auth que retornam token JWT e devem receber o cookie
 const TOKEN_ENDPOINTS = [
@@ -15,7 +21,7 @@ const TOKEN_ENDPOINTS = [
 
 async function handler(request: NextRequest, { params }: { params: { path: string[] } }) {
   const path = '/auth/' + params.path.join('/')
-  const backendUrl = BACKEND_URL.replace(/\/$/, '') + path
+  const backendUrl = backendBaseUrl() + path
 
   // Logout: limpa cookie e encaminha para o backend
   if (path === '/auth/logout') {
@@ -43,10 +49,13 @@ async function handler(request: NextRequest, { params }: { params: { path: strin
     ? await request.text()
     : undefined
 
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const incomingAuth = request.headers.get('authorization')
   const cookieStore = cookies()
   const existingToken = cookieStore.get('veltrix_token')?.value
-  if (existingToken) {
+  if (incomingAuth) {
+    headers['Authorization'] = incomingAuth
+  } else if (existingToken) {
     headers['Authorization'] = `Bearer ${existingToken}`
   }
 
